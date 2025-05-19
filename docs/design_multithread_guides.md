@@ -1,3 +1,12 @@
+Okay, I'll add a multi-threading option to the `orchestrator.py` script for generating feature slice guides in parallel. This will be controlled by a new `--threads` command-line argument.
+
+Here are the changes:
+
+**1. Modified `feature_symphony_tool/src/orchestrator.py`**
+
+I've added the `--threads` option and integrated `concurrent.futures.ThreadPoolExecutor` for parallel guide generation when `threads > 1` and processing a symphony XML.
+
+```python
 # feature_symphony_tool/src/orchestrator.py
 import xml.etree.ElementTree as ET
 import json
@@ -109,6 +118,7 @@ Begin the guide now:
         # Return a placeholder or re-raise if critical, current behavior is to re-raise
         # For threaded execution, better to return a failed marker or specific exception
         return f"# FAILED GUIDE: {feature_name}\n\nError during generation: {e}"
+
 
 def save_guide(guide_content: str, output_dir: Path, feature_name: str) -> Path:
     """Saves the generated guide to a file in the specified directory."""
@@ -318,4 +328,46 @@ def main(
         sys.exit(1)
 
 if __name__ == '__main__':
-    main() 
+    main()
+```
+
+**2. Updated `feature_symphony_tool/README.md`**
+
+Added a note about the `--threads` option.
+
+```diff
+--- a/feature_symphony_tool/README.md
++++ b/feature_symphony_tool/README.md
+@@ -107,6 +107,11 @@
+     path/to/feature_symphony_tool/run_symphony.sh path/to/your/my_feature_breakdown.xml
+     ```
+ 
++    **Multi-threading for Guide Generation**:
++    The `orchestrator.py` script supports a `--threads N` option to generate feature slice guides in parallel.
++    To use this, you can modify the `run_symphony.sh` script directly. For example, change the line:
++    `python3 "$PYTHON_SCRIPT_PATH" \`
++    to include the threads option:
++    `python3 "$PYTHON_SCRIPT_PATH" --threads 4 \` (to use 4 threads)
++    The default is 1 thread (sequential processing). This option is only relevant when processing a full symphony XML.
++
+ 3.  **Monitor Aider Tasks (macOS)**:
+     *   This tool will open a **new Terminal window for each Aider task** when running on macOS.
+     *   Each Terminal window will contain its own dedicated Zellij session running one Aider instance.
+
+```
+
+**Explanation of Changes in `orchestrator.py`:**
+
+1.  **Import `ThreadPoolExecutor`**: Added `from concurrent.futures import ThreadPoolExecutor, as_completed`.
+2.  **`--threads` CLI Option**: A new Click option `--threads` is added to the `main` function, defaulting to 1.
+3.  **Parallel Execution Logic**:
+    *   Inside the `if symphony_xml:` block, if `threads > 1` and there are features to process, it uses a `ThreadPoolExecutor`.
+    *   `executor.submit()` is used to queue up `generate_feature_slice_guide` calls for each feature.
+    *   `as_completed()` is used to process results as they finish.
+    *   Error handling is included for futures: if a guide generation fails, an error message is printed, and a placeholder "FAILED GUIDE" content is stored.
+4.  **Sequential Fallback**: If `threads == 1` (or invalid value <=0) or there are no features, it falls back to the existing sequential loop.
+5.  **Result Collection and Saving**: All generated guide content (or failure placeholders) along with their corresponding `feature_info` are collected in `generated_guides_data`. After all threads (or sequential tasks) complete, this list is iterated to save the guides and prepare the Aider task definitions. This ensures file saving is done sequentially.
+6.  **`aider_model` in JSON**: Ensured `aider_model_config` is correctly passed to `prepare_aider_tasks_json` and included in each task within the output JSON.
+7.  **Error Handling**: Improved error message for missing `OPENROUTER_API_KEY`. The `generate_feature_slice_guide` function now returns a failure marker string instead of re-raising immediately, which is better for threaded execution where you want to collect all results. The main loop that processes futures now handles exceptions from `future.result()`.
+
+This setup allows for significantly faster guide generation when dealing with multiple features in a symphony XML by leveraging multiple threads for the API calls. The rest of the workflow (saving guides, creating JSON, launching Aider tasks) remains sequential after the parallel generation phase.

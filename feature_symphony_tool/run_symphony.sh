@@ -7,14 +7,27 @@ TOOL_ROOT="$SCRIPT_DIR_SYMPHONY" # Assuming this script is in feature_symphony_t
 echo "--- Feature Symphony Orchestrator ---"
 
 if [[ $# -lt 1 ]]; then
-  echo "Usage: $0 <path_to_symphony_xml_file>"
+  echo "Usage: $0 <path_to_symphony_xml_file> [--threads N]"
   echo "Example: $0 docs/my_feature_plan.xml"
+  echo "Example with threads: $0 docs/my_feature_plan.xml --threads 4"
   echo "This script should be run from your main project's root directory."
   exit 1
 fi
 
 SYMPHONY_XML_FILE_REL_PATH="$1" # Path relative to current PWD (project root)
 SYMPHONY_XML_FILE_ABS_PATH="$(pwd)/$SYMPHONY_XML_FILE_REL_PATH"
+
+# Check for --threads option
+THREADS=1 # Default to 1 thread
+if [[ $# -ge 3 && "$2" == "--threads" ]]; then
+  THREADS="$3"
+  # Validate that THREADS is a number
+  if ! [[ "$THREADS" =~ ^[0-9]+$ ]]; then
+    echo "Error: Threads value must be a positive integer"
+    exit 1
+  fi
+  echo "Using $THREADS thread(s) for guide generation"
+fi
 
 CONFIG_FILE_PATH="$TOOL_ROOT/config/config.yaml"
 PYTHON_SCRIPT_PATH="$TOOL_ROOT/src/orchestrator.py"
@@ -104,7 +117,8 @@ python3 "$PYTHON_SCRIPT_PATH" \
     --run-id "$RUN_ID" \
     --output-json-file "$AIDER_TASKS_JSON_PATH" \
     --project-root "$(pwd)" \
-    --repo-context-file "repo_contents.txt"
+    --repo-context-file "repo_contents.txt" \
+    --threads "$THREADS"
 
 exit_code=$?
 if [ $exit_code -ne 0 ]; then

@@ -87,6 +87,14 @@ This tool automates the process of breaking down large features into smaller, ma
     path/to/feature_symphony_tool/run_symphony.sh path/to/my_feature_breakdown.xml
     ```
 
+    **Multi-threading for Guide Generation**:
+    The `orchestrator.py` script supports a `--threads N` option to generate feature slice guides in parallel.
+    To use this, you can modify the `run_symphony.sh` script directly. For example, change the line:
+    `python3 "$PYTHON_SCRIPT_PATH" \`
+    to include the threads option:
+    `python3 "$PYTHON_SCRIPT_PATH" --threads 4 \` (to use 4 threads)
+    The default is 1 thread (sequential processing). This option is only relevant when processing a full symphony XML.
+
 3.  **Monitor Aider Tasks (macOS)**:
     *   This tool will open a **new Terminal window for each Aider task** when running on macOS.
     *   Each Terminal window will contain its own dedicated Zellij session running one Aider instance.
