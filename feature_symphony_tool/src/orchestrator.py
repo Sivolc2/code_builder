@@ -69,7 +69,7 @@ def generate_feature_slice_guide(
     feature_name = feature_info["name"]
     feature_description = feature_info["description"]
     
-    print(f"Generating guide for feature slice: {feature_name}")
+    print(f"Generating guide for: {feature_name}")
     
     # Include repository context if available
     context_text = ""
@@ -102,7 +102,7 @@ Begin the guide now:
 """
     
     try:
-        guide_content = call_openrouter_api(prompt, openrouter_api_key, openrouter_model)
+        guide_content = call_openrouter_api(prompt, openrouter_api_key, openrouter_model, feature_name)
         return guide_content
     except Exception as e:
         print(f"Failed to generate guide for '{feature_name}': {e}")
@@ -128,21 +128,13 @@ def save_guide(guide_content: str, output_dir: Path, feature_name: str) -> Path:
 def prepare_aider_tasks_json(
     tasks: list, 
     zellij_session_prefix: str,
-    run_id: str,
-    aider_model: str # Added aider_model
+    run_id: str
 ) -> dict:
     """Prepares the JSON structure for launch_aiders_zellij.sh."""
-    # Add aider_model to each task if not already present
-    updated_tasks = []
-    for task in tasks:
-        if "aider_model" not in task:
-            task["aider_model"] = aider_model
-        updated_tasks.append(task)
-
     return {
         "zellij_session_prefix": zellij_session_prefix,
         "run_id": run_id,
-        "tasks": updated_tasks
+        "tasks": tasks
     }
 
 @click.command()
@@ -180,7 +172,6 @@ def main(
             raise ConfigError("OPENROUTER_API_KEY environment variable not set.")
             
         openrouter_model_guide = config.get('openrouter_model_guide_generation', 'google/gemini-1.5-pro-latest')
-        aider_model_config = config.get('aider_model', 'default/aider-model') # Get aider_model for tasks
         
         # Output directory for guides, relative to the project_root
         guides_output_dir_rel = config.get('guides_output_directory', 'docs/feature_guides')
@@ -214,20 +205,29 @@ def main(
 
             if threads > 1 and len(features) > 0:
                 with ThreadPoolExecutor(max_workers=threads) as executor:
-                    future_to_feature = {
-                        executor.submit(
+                    future_to_feature = {}
+                    
+                    # First announce all features that will be processed
+                    for i, feature_info in enumerate(features):
+                        print(f"Feature {i+1}/{len(features)}: {feature_info['name']} - Queued for processing")
+                    
+                    # Now submit features to thread pool
+                    for feature_info in features:
+                        print(f"Starting guide generation for: {feature_info['name']}")
+                        future = executor.submit(
                             generate_feature_slice_guide,
                             feature_info,
                             openrouter_api_key,
                             openrouter_model_guide,
                             project_root,
                             actual_repo_context_file
-                            # tool_root is an optional param in generate_feature_slice_guide, not passed here
-                        ): feature_info for feature_info in features
-                    }
+                        )
+                        future_to_feature[future] = feature_info
+                        
+                    # Process completed futures
                     for i, future in enumerate(as_completed(future_to_feature)):
                         feature_info = future_to_feature[future]
-                        print(f"Processing feature {i+1}/{len(features)}: {feature_info['name']} (from thread)")
+                        print(f"Completed guide generation for: {feature_info['name']}")
                         try:
                             guide_content = future.result()
                             generated_guides_data.append((feature_info, guide_content))
@@ -237,7 +237,7 @@ def main(
                             generated_guides_data.append((feature_info, f"# FAILED GUIDE: {feature_info['name']}\n\n{error_message}"))
             else: # Sequential processing (threads == 1 or no features)
                 for i, feature_info in enumerate(features):
-                    print(f"Processing feature {i+1}/{len(features)}: {feature_info['name']} (sequentially)")
+                    print(f"Feature {i+1}/{len(features)}: {feature_info['name']} - Processing sequentially")
                     try:
                         guide_content = generate_feature_slice_guide(
                             feature_info,
@@ -246,6 +246,7 @@ def main(
                             project_root,
                             actual_repo_context_file
                         )
+                        print(f"Completed guide generation for: {feature_info['name']}")
                         generated_guides_data.append((feature_info, guide_content))
                     except Exception as exc:
                         error_message = f"Error generating guide for '{feature_info['name']}': {exc}"
@@ -262,8 +263,7 @@ def main(
                     "guide_file": str(saved_guide_path_rel), 
                     "global_files": aider_global_context_files_rel, 
                     "prompt": DEFAULT_AIDER_PROMPT,
-                    "description": f"Implement feature: {feature_info['name']}",
-                    "aider_model": aider_model_config # Ensure this is added
+                    "description": f"Implement feature: {feature_info['name']}"
                 })
 
         elif single_guide:
@@ -274,8 +274,7 @@ def main(
                 "guide_file": str(single_guide_rel), 
                 "global_files": aider_global_context_files_rel, 
                 "prompt": DEFAULT_AIDER_PROMPT,
-                "description": f"Implement guide: {single_guide.name}",
-                "aider_model": aider_model_config # Ensure this is added
+                "description": f"Implement guide: {single_guide.name}"
             })
         else:
             raise click.UsageError("Either --symphony-xml or --single-guide must be provided.")
@@ -284,8 +283,7 @@ def main(
         output_json_data = prepare_aider_tasks_json(
             aider_tasks,
             zellij_session_prefix,
-            run_id,
-            aider_model_config # Pass aider_model_config here
+            run_id
         )
         
         # Create output directory if it doesn't exist

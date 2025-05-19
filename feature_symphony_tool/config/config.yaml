@@ -10,10 +10,7 @@ openrouter_api_key_required: true # Reminder that API key is needed via env
 
 # OpenRouter model to use for generating feature slice guides.
 # Available models: "anthropic/claude-3-7-sonnet", "openai/gpt-4o", "google/gemini-1.5-pro", etc.
-openrouter_model_guide_generation: "anthropic/claude-3-7-sonnet"
-
-# OpenRouter model for Aider tasks. Aider will use OPENROUTER_API_KEY and this model.
-aider_model: "anthropic/claude-3-7-sonnet"
+openrouter_model_guide_generation: "anthropic/claude-3-7-sonnet-20250219"
 
 # Aider Configuration
 # List of global context files to always include with Aider.

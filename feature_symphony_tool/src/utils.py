@@ -30,12 +30,12 @@ def get_openrouter_api_key() -> str:
         raise ConfigError("OpenRouter API key not found. Set the OPENROUTER_API_KEY environment variable.")
     return api_key
 
-def call_openrouter_api(prompt_text: str, api_key: str, model_name: str) -> str:
+def call_openrouter_api(prompt_text: str, api_key: str, model_name: str, feature_name: str = None) -> str:
     """
     Calls the OpenRouter API with the given prompt and returns the text response.
     """
-    print(f"\nCalling OpenRouter API with model: {model_name}...")
-    # print(f"Prompt (first 100 chars): {prompt_text[:100]}...")
+    feature_info = f" for '{feature_name}'" if feature_name else ""
+    print(f"Calling OpenRouter API{feature_info} with model: {model_name}")
 
     OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
     
@@ -62,7 +62,7 @@ def call_openrouter_api(prompt_text: str, api_key: str, model_name: str) -> str:
         
         if response_data and 'choices' in response_data and response_data['choices']:
             generated_text = response_data['choices'][0]['message']['content']
-            print("OpenRouter API call successful.")
+            print(f"OpenRouter API call successful{feature_info}.")
             return generated_text
         else:
             # Print full response for debugging if no choices
@@ -70,7 +70,7 @@ def call_openrouter_api(prompt_text: str, api_key: str, model_name: str) -> str:
             raise Exception("OpenRouter API call failed: Unexpected response structure.")
 
     except Exception as e:
-        print(f"Error calling OpenRouter API: {e}")
+        print(f"Error calling OpenRouter API{feature_info}: {e}")
         raise
 
 def generate_slug(text: str) -> str:

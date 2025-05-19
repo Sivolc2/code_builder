@@ -54,7 +54,6 @@ do
     GUIDE_FILE=$(echo "$TASK_INFO" | jq -r '.guide_file')
     PROMPT_RAW=$(echo "$TASK_INFO" | jq -r '.prompt')
     DESCRIPTION_RAW=$(echo "$TASK_INFO" | jq -r '.description')
-    AIDER_TASK_MODEL=$(echo "$TASK_INFO" | jq -r '.aider_model // empty') 
 
     # Process global files with proper quoting
     GLOBAL_FILES=""
@@ -86,11 +85,6 @@ EOSCRIPT
     echo "cd \"$PROJECT_ROOT_ABS_PATH\"" >> "$TERMINAL_SCRIPT"
     echo "TASK_ID=\"$TASK_ID\"" >> "$TERMINAL_SCRIPT"
     
-    # Add model environment variable if specified
-    if [ -n "$AIDER_TASK_MODEL" ]; then
-        echo "export AIDER_MODEL=\"$AIDER_TASK_MODEL\"" >> "$TERMINAL_SCRIPT"
-    fi
-
     # Add environment setup - optional, depending on your needs
     cat >> "$TERMINAL_SCRIPT" << 'EOSCRIPT'
 # Optional: load environment variables if needed
