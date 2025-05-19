@@ -17,7 +17,7 @@ FEATURE_SLICE_GUIDE_REL_PATH="$1"
 FEATURE_SLICE_GUIDE_ABS_PATH="$(pwd)/$FEATURE_SLICE_GUIDE_REL_PATH"
 
 CONFIG_FILE_PATH="$TOOL_ROOT/config/config.yaml"
-LAUNCH_AIDERS_SCRIPT_PATH="$TOOL_ROOT/bin/launch_aiders_zellij.sh"
+LAUNCH_AIDERS_SCRIPT_PATH="$TOOL_ROOT/bin/launch_aiders_terminal.sh"
 PYTHON_SCRIPT_PATH="$TOOL_ROOT/src/orchestrator.py"
 TOOL_RUN_ARTIFACTS_DIR_NAME="" # Will be read from config
 
@@ -112,16 +112,27 @@ fi
 echo "Launching Aider task..."
 bash "$LAUNCH_AIDERS_SCRIPT_PATH" "$RUN_ID" "$SINGLE_TASK_JSON"
 
+exit_code=$?
+if [ $exit_code -ne 0 ]; then
+  echo "Error: Aider launch script failed with exit code $exit_code"
+  exit $exit_code
+fi
+
 echo "------------------------------------"
 echo "Standalone Aider Task Completed"
 
 # Check if we're on macOS
 if command -v osascript >/dev/null 2>&1; then
   echo "On macOS: A new Terminal window should have opened with the Aider task."
-  echo "Look for a new Terminal window with a Zellij session named:"
-  echo "  symphony_aider_${RUN_ID}_task1_..."
+  echo "Task ID: task1_${RUN_ID}"
+  echo ""
+  echo "You can interact with Aider directly in that Terminal window."
+  echo "The window will remain open after Aider completes for your review."
+  echo "When you're done, you can close the window or type 'exit'."
 else
-  echo "Aider agent should be running in a Zellij session."
-  echo "Attach to session with: zellij attach symphony_aider_$RUN_ID"
+  echo "Error: This script is designed for macOS with AppleScript support."
+  echo "On other platforms, you should run Aider directly:"
+  echo "  cd $(pwd)"
+  echo "  aider docs/feature_guides/your_guide.md --message \"Your prompt\""
 fi
 echo "------------------------------------" 

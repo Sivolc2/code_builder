@@ -37,6 +37,17 @@ echo "Found $TASK_COUNT tasks to launch."
 TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
+# Terminal window positioning configuration
+WINDOW_WIDTH=800
+WINDOW_HEIGHT=600
+WINDOWS_PER_COLUMN=6
+COLUMN_WIDTH=$((WINDOW_WIDTH + 50)) # Add some gap between columns
+WINDOW_VERTICAL_OFFSET=30  # Slightly overlap windows vertically (title bar height)
+SCREEN_TOP_MARGIN=25       # Start near the top of the screen
+SCREEN_LEFT_MARGIN=10      # Start near the left edge
+MAX_COLUMNS=2              # Maximum number of columns before wrapping back to the left side
+COLUMN_GROUP_OFFSET=200    # Larger vertical offset for each group of columns when wrapping
+
 for (( i=0; i<$TASK_COUNT; i++ ))
 do
     TASK_INFO=$(jq -c ".tasks[$i]" "$TASKS_JSON_FILE")
@@ -127,13 +138,34 @@ EOSCRIPT
     # Create a simple AppleScript file that just runs our terminal script
     APPLESCRIPT_FILE="${TEMP_DIR}/task_${WINDOW_NUM}.scpt"
     
+    # Calculate window position with wrap-around for many windows
+    BASE_COLUMN_INDEX=$((i / WINDOWS_PER_COLUMN))
+    ROW_INDEX=$((i % WINDOWS_PER_COLUMN))
+    
+    # When exceeding MAX_COLUMNS, wrap back to left side with vertical offset
+    GROUP_INDEX=$((BASE_COLUMN_INDEX / MAX_COLUMNS))  # Which group of columns (0, 1, 2, etc.)
+    COLUMN_INDEX=$((BASE_COLUMN_INDEX % MAX_COLUMNS)) # Column within the group (0 to MAX_COLUMNS-1)
+    
+    LEFT=$((SCREEN_LEFT_MARGIN + COLUMN_INDEX * COLUMN_WIDTH))
+    
+    # Apply vertical offset for each group and add row position within the group
+    VERTICAL_GROUP_OFFSET=$((GROUP_INDEX * COLUMN_GROUP_OFFSET))
+    TOP=$((SCREEN_TOP_MARGIN + VERTICAL_GROUP_OFFSET + ROW_INDEX * WINDOW_VERTICAL_OFFSET))
+    
+    RIGHT=$((LEFT + WINDOW_WIDTH))
+    BOTTOM=$((TOP + WINDOW_HEIGHT))
+    
     cat > "$APPLESCRIPT_FILE" << EOF
 tell application "Terminal"
-    do script "${TERMINAL_SCRIPT}"
+    set newWindow to do script "${TERMINAL_SCRIPT}"
+    delay 0.5
+    set bounds of front window to {$LEFT, $TOP, $RIGHT, $BOTTOM}
+    set custom title of front window to "${TASK_ID}"
 end tell
 EOF
 
     echo "  Executing AppleScript to open new Terminal window for task $WINDOW_NUM (ID: $TASK_ID)"
+    echo "  Window position: {$LEFT, $TOP, $RIGHT, $BOTTOM}"
     
     # Run the AppleScript file
     osascript "$APPLESCRIPT_FILE"
