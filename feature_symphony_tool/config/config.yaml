@@ -5,15 +5,15 @@
 # Your OpenRouter API Key.
 # IMPORTANT: It's highly recommended to set this via the OPENROUTER_API_KEY environment variable
 # (e.g., in an .env file) instead of hardcoding it here for security.
-# The tool will ONLY use the OPENROUTER_API_KEY environment variable, this key here is ignored now.
-openrouter_api_key_in_env_required: true # Placeholder to remind user API key is needed via env
+# The tool will ONLY use the OPENROUTER_API_KEY environment variable.
+openrouter_api_key_required: true # Reminder that API key is needed via env
 
 # OpenRouter model to use for generating feature slice guides.
-# Example: "google/gemini-2.5-pro-preview", "openai/gpt-4o"
-openrouter_model_guide_generation: "google/gemini-2.5-pro-preview"
+# Available models: "anthropic/claude-3-7-sonnet", "openai/gpt-4o", "google/gemini-1.5-pro", etc.
+openrouter_model_guide_generation: "anthropic/claude-3-7-sonnet"
 
 # OpenRouter model for Aider tasks. Aider will use OPENROUTER_API_KEY and this model.
-aider_model: "openai/gpt-4o"
+aider_model: "anthropic/claude-3-7-sonnet"
 
 # Aider Configuration
 # List of global context files to always include with Aider.
