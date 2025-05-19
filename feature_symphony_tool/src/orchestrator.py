@@ -124,12 +124,12 @@ def save_guide(guide_content: str, output_dir: Path, feature_name: str) -> Path:
 
 def prepare_aider_tasks_json(
     tasks: list, 
-    tmux_session_prefix: str,
+    zellij_session_prefix: str,
     run_id: str
 ) -> dict:
-    """Prepares the JSON structure for launch_aiders.sh."""
+    """Prepares the JSON structure for launch_aiders_zellij.sh."""
     return {
-        "tmux_session_prefix": tmux_session_prefix,
+        "zellij_session_prefix": zellij_session_prefix,
         "run_id": run_id,
         "tasks": tasks
     }
@@ -170,8 +170,8 @@ def main(
         guides_output_dir_abs = project_root / guides_output_dir_rel
         print(f"Guides output directory: {guides_output_dir_abs}")
         
-        # tmux session prefix for Aider runs
-        tmux_session_prefix = config.get('tmux_session_prefix', 'symphony_aider')
+        # Zellij session prefix for Aider runs
+        zellij_session_prefix = config.get('zellij_session_prefix', 'symphony_aider')
         
         # Global context files for Aider, relative to project_root
         aider_global_context_files_rel = config.get('aider_global_context_files', [])
@@ -224,7 +224,7 @@ def main(
         # Prepare the final output JSON
         output_json = prepare_aider_tasks_json(
             aider_tasks,
-            tmux_session_prefix,
+            zellij_session_prefix,
             run_id
         )
         

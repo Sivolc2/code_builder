@@ -6,7 +6,7 @@ This tool automates the process of breaking down large features into smaller, ma
 
 1.  **Python**: Version 3.8+
 2.  **Git**: For the `dump_repo.sh` script.
-3.  **tmux**: For running Aider instances in parallel. (e.g., `sudo apt install tmux` or `brew install tmux`)
+3.  **Zellij**: For running Aider instances in parallel. (e.g., `brew install zellij` or `cargo install zellij`)
 4.  **jq**: For parsing JSON in shell scripts. (e.g., `sudo apt install jq` or `brew install jq`)
 5.  **Aider**: Ensure `aider` is installed and configured. See Aider's documentation.
 6.  **OpenRouter API Key**: You'll need an API key from OpenRouter.
@@ -19,6 +19,8 @@ This tool automates the process of breaking down large features into smaller, ma
 2.  **Install Dependencies**:
     ```bash
     cd feature_symphony_tool
+    python3 -m venv .venv
+    source .venv/bin/activate
     pip install -r requirements.txt
     ```
 
@@ -62,7 +64,7 @@ This tool automates the process of breaking down large features into smaller, ma
 5.  **Make Scripts Executable**:
     ```bash
     chmod +x bin/dump_repo.sh
-    chmod +x bin/launch_aiders.sh
+    chmod +x bin/launch_aiders_zellij.sh
     chmod +x run_symphony.sh
     chmod +x run_single_aider_task.sh
     ```
@@ -84,6 +86,95 @@ This tool automates the process of breaking down large features into smaller, ma
     cd your_project_root  # where your Git repository is
     path/to/feature_symphony_tool/run_symphony.sh path/to/my_feature_breakdown.xml
     ```
+
+### Example Commands
+
+Here are some practical examples of how to use the tool:
+
+1. **Basic Setup and Configuration**:
+   ```bash
+   # Clone the tool into your project
+   cd your_project_root
+   git clone https://github.com/your-org/feature_symphony_tool.git
+
+   # Setup the tool
+   cd feature_symphony_tool
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+
+   # Configure the tool
+   cp config/config.yaml.template config/config.yaml
+   cp .env.template .env
+   # Edit config.yaml and .env with your settings
+   ```
+
+2. **Generate Repository Context**:
+   ```bash
+   # From your project root
+   ./feature_symphony_tool/bin/dump_repo.sh
+   # This creates repo_contents.txt in your project root
+   ```
+
+3. **Create a Feature Breakdown**:
+   ```bash
+   # Create a new XML file for your feature breakdown
+   cat > my_feature_breakdown.xml << EOF
+   <feature_symphony>
+   [
+       {
+           "name": "User Authentication",
+           "description": "Implement user login, registration, and session management"
+       },
+       {
+           "name": "Password Reset",
+           "description": "Add password reset functionality with email verification"
+       }
+   ]
+   </feature_symphony>
+   EOF
+   ```
+
+4. **Run Full Feature Symphony**:
+   ```bash
+   # From your project root
+   ./feature_symphony_tool/run_symphony.sh my_feature_breakdown.xml
+   ```
+
+5. **Run Single Feature Guide**:
+   ```bash
+   # If you have a pre-existing guide
+   ./feature_symphony_tool/run_single_aider_task.sh docs/feature_guides/feature_slice_guide_user_authentication.md
+   ```
+
+6. **Working with Zellij Sessions**:
+   ```bash
+   # List all Zellij sessions
+   zellij ls
+
+   # Attach to a specific session
+   zellij attach symphony_aider_20240315_123456
+
+   # Switch between panes
+   # Press Ctrl+P, then use arrow keys
+
+   # Close a pane
+   # Press Ctrl+P, then X
+   ```
+
+7. **Environment Setup for Each Run**:
+   ```bash
+   # Activate the tool's virtual environment
+   cd feature_symphony_tool
+   source .venv/bin/activate
+   source .env  # Load API keys
+
+   # Return to project root
+   cd ..
+
+   # Now run the tool
+   ./feature_symphony_tool/run_symphony.sh my_feature_breakdown.xml
+   ```
 
 ## `git dump` Script
 
@@ -129,9 +220,10 @@ vim path/to/feature_symphony_tool/bin/dump_repo.sh
     ```
 
 3.  **Work with Aider**:
-    Once the Aider instances are launched in tmux:
-    *   Attach to the tmux session: `tmux attach-session -t symphony_aider_20230615_123456`.
-    *   Switch between windows (each running one Aider instance for one feature slice): `Ctrl+b <window number>`.
+    Once the Aider instances are launched in Zellij:
+    *   Attach to the Zellij session: `zellij attach symphony_aider_20230615_123456`.
+    *   Switch between panes: `Ctrl+P` then arrow keys.
+    *   Close a pane: `Ctrl+P` then `X`.
 
 ## Standalone Aider Task
 

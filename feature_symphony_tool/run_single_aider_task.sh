@@ -17,7 +17,7 @@ FEATURE_SLICE_GUIDE_REL_PATH="$1"
 FEATURE_SLICE_GUIDE_ABS_PATH="$(pwd)/$FEATURE_SLICE_GUIDE_REL_PATH"
 
 CONFIG_FILE_PATH="$TOOL_ROOT/config/config.yaml"
-LAUNCH_AIDERS_SCRIPT_PATH="$TOOL_ROOT/bin/launch_aiders.sh"
+LAUNCH_AIDERS_SCRIPT_PATH="$TOOL_ROOT/bin/launch_aiders_zellij.sh"
 PYTHON_SCRIPT_PATH="$TOOL_ROOT/src/orchestrator.py"
 TOOL_RUN_ARTIFACTS_DIR_NAME="" # Will be read from config
 
@@ -114,6 +114,6 @@ bash "$LAUNCH_AIDERS_SCRIPT_PATH" "$RUN_ID" "$SINGLE_TASK_JSON"
 
 echo "------------------------------------"
 echo "Standalone Aider Task Completed"
-echo "Aider agent should be running in a tmux session."
-echo "Attach to session with: tmux attach-session -t symphony_aider_$RUN_ID"
+echo "Aider agent should be running in a Zellij session."
+echo "Attach to session with: zellij attach symphony_aider_$RUN_ID"
 echo "------------------------------------" 

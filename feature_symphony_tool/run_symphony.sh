@@ -16,10 +16,9 @@ fi
 SYMPHONY_XML_FILE_REL_PATH="$1" # Path relative to current PWD (project root)
 SYMPHONY_XML_FILE_ABS_PATH="$(pwd)/$SYMPHONY_XML_FILE_REL_PATH"
 
-
 CONFIG_FILE_PATH="$TOOL_ROOT/config/config.yaml"
 PYTHON_SCRIPT_PATH="$TOOL_ROOT/src/orchestrator.py"
-LAUNCH_AIDERS_SCRIPT_PATH="$TOOL_ROOT/bin/launch_aiders.sh"
+LAUNCH_AIDERS_SCRIPT_PATH="$TOOL_ROOT/bin/launch_aiders_zellij.sh"
 TOOL_RUN_ARTIFACTS_DIR_NAME="" # Will be read from config
 
 # Ensure we're run from project root
@@ -124,6 +123,6 @@ bash "$LAUNCH_AIDERS_SCRIPT_PATH" "$RUN_ID" "$AIDER_TASKS_JSON_PATH"
 
 echo "-----------------------------------"
 echo "Feature Symphony Orchestration Complete!"
-echo "Aider agents should be running in tmux session."
-echo "Attach to session with: tmux attach-session -t symphony_aider_$RUN_ID"
+echo "Aider agents should be running in Zellij session."
+echo "Attach to session with: zellij attach symphony_aider_$RUN_ID"
 echo "-----------------------------------" 
