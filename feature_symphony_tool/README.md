@@ -87,6 +87,13 @@ This tool automates the process of breaking down large features into smaller, ma
     path/to/feature_symphony_tool/run_symphony.sh path/to/my_feature_breakdown.xml
     ```
 
+3.  **Monitor Aider Tasks (macOS)**:
+    *   This tool will open a **new Terminal window for each Aider task** when running on macOS.
+    *   Each Terminal window will contain its own dedicated Zellij session running one Aider instance.
+    *   You can interact with each Aider instance in its respective window.
+    *   To close a specific Aider task, you can type `exit` or `Ctrl+D` in its Zellij pane, or simply close the Terminal window.
+    *   Zellij sessions are named like `symphony_aider_RUNID_taskN_description`. You can list them with `zellij list-sessions` and attach manually if needed, e.g., `zellij attach session_name`.
+
 ### Example Commands
 
 Here are some practical examples of how to use the tool:
@@ -147,21 +154,6 @@ Here are some practical examples of how to use the tool:
    ./feature_symphony_tool/run_single_aider_task.sh docs/feature_guides/feature_slice_guide_user_authentication.md
    ```
 
-6. **Working with Zellij Sessions**:
-   ```bash
-   # List all Zellij sessions
-   zellij ls
-
-   # Attach to a specific session
-   zellij attach symphony_aider_20240315_123456
-
-   # Switch between panes
-   # Press Ctrl+P, then use arrow keys
-
-   # Close a pane
-   # Press Ctrl+P, then X
-   ```
-
 7. **Environment Setup for Each Run**:
    ```bash
    # Activate the tool's virtual environment
@@ -218,12 +210,6 @@ vim path/to/feature_symphony_tool/bin/dump_repo.sh
     ```bash
     path/to/feature_symphony_tool/run_symphony.sh path/to/your/my_feature_breakdown.xml
     ```
-
-3.  **Work with Aider**:
-    Once the Aider instances are launched in Zellij:
-    *   Attach to the Zellij session: `zellij attach symphony_aider_20230615_123456`.
-    *   Switch between panes: `Ctrl+P` then arrow keys.
-    *   Close a pane: `Ctrl+P` then `X`.
 
 ## Standalone Aider Task
 

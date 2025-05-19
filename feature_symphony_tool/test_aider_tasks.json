@@ -1,0 +1,11 @@
+{
+  "zellij_session_prefix": "test_symphony",
+  "tasks": [
+    {
+      "guide_file": "README.md",
+      "prompt": "Please analyze this README file and summarize its contents.",
+      "description": "Analyze README file",
+      "global_files": []
+    }
+  ]
+} 

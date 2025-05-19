@@ -114,6 +114,14 @@ bash "$LAUNCH_AIDERS_SCRIPT_PATH" "$RUN_ID" "$SINGLE_TASK_JSON"
 
 echo "------------------------------------"
 echo "Standalone Aider Task Completed"
-echo "Aider agent should be running in a Zellij session."
-echo "Attach to session with: zellij attach symphony_aider_$RUN_ID"
+
+# Check if we're on macOS
+if command -v osascript >/dev/null 2>&1; then
+  echo "On macOS: A new Terminal window should have opened with the Aider task."
+  echo "Look for a new Terminal window with a Zellij session named:"
+  echo "  symphony_aider_${RUN_ID}_task1_..."
+else
+  echo "Aider agent should be running in a Zellij session."
+  echo "Attach to session with: zellij attach symphony_aider_$RUN_ID"
+fi
 echo "------------------------------------" 
