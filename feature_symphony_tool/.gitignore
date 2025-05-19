@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.env
+*.egg
+dist/
+build/
+*.ini
+*.log
+*.db
+*.sqlite3
+
+# feature_symphony_tool specific
+config/config.yaml # Encourage users to use config.yaml.template and not commit their actual config
+runs/ # Tool's internal run artifacts
+
+# Virtual environment
+.venv/
+venv/
+ENV/ 

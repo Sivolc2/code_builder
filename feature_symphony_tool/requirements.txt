@@ -1,0 +1,11 @@
+# Core dependencies
+PyYAML>=6.0
+requests>=2.28.0
+python-dotenv>=1.0.0
+google-generativeai>=0.5.0 # For Gemini API
+
+# For slugifying filenames (optional, can implement manually)
+python-slugify>=8.0.0
+
+# Utility for command line interfaces
+click>=8.0.0 

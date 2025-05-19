@@ -183,3 +183,5 @@ code_builder/.env        # If using a .env file for API keys
 
 docs/prd/last_response.json
 docs/prd/last_request.json
+feature_symphony_tool/runs/
+test_project/** 
