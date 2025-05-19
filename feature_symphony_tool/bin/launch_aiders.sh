@@ -52,7 +52,6 @@ do
     GUIDE_FILE=$(echo "$TASK_INFO" | jq -r '.guide_file')
     PROMPT=$(echo "$TASK_INFO" | jq -r '.prompt')
     DESCRIPTION=$(echo "$TASK_INFO" | jq -r '.description')
-    AIDER_TASK_MODEL=$(echo "$TASK_INFO" | jq -r '.aider_model // empty') # Get aider_model from task or empty string
     # Convert global_files array to a space-separated string
     GLOBAL_FILES=$(echo "$TASK_INFO" | jq -r '.global_files | join(" ")')
     
@@ -65,15 +64,7 @@ do
     
     # Build the Aider command
     # The --yes flag prevents Aider from asking for confirmation
-    # Set AIDER_MODEL environment variable for this specific aider process if specified in the task JSON
-    AIDER_CMD=""
-    if [ -n "$AIDER_TASK_MODEL" ]; then
-        # Prepend environment variable setting for this command
-        AIDER_CMD="AIDER_MODEL=\"$AIDER_TASK_MODEL\" aider $GUIDE_FILE $GLOBAL_FILES --message \"$PROMPT\" --yes"
-    else
-        # Use default aider behavior (will pick from its own config/env)
-        AIDER_CMD="aider $GUIDE_FILE $GLOBAL_FILES --message \"$PROMPT\" --yes"
-    fi
+    AIDER_CMD="aider $GUIDE_FILE $GLOBAL_FILES --message \"$PROMPT\" --yes"
     
     # Send command to the tmux window
     tmux send-keys -t "$TMUX_SESSION_NAME:$WINDOW_NUM" "echo 'Task $WINDOW_NUM: $DESCRIPTION'" C-m

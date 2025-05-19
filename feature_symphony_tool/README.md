@@ -24,7 +24,7 @@ This tool automates the process of breaking down large features into smaller, ma
 
 3.  **Configure**:
     *   Copy `config/config.yaml.template` to `config/config.yaml`.
-    *   Edit `config/config.yaml` to set your `openrouter_model_guide_generation`, `aider_model`, `aider_global_context_files`, and `guides_output_directory` (relative to your main project root).
+    *   Edit `config/config.yaml` to set your `openrouter_model_guide_generation`, `aider_global_context_files`, and `guides_output_directory` (relative to your main project root).
     *   Copy `.env.template` to `.env`.
     *   Edit `.env` to add your `OPENROUTER_API_KEY`.
         ```bash
@@ -35,7 +35,31 @@ This tool automates the process of breaking down large features into smaller, ma
         # Now edit config/config.yaml and .env with your details
         ```
 
-4.  **Make Scripts Executable**:
+4.  **Configure Aider for OpenRouter**:
+    The tool uses OpenRouter for both guide generation and Aider tasks. While the Python side uses the API key from the `.env` file, Aider will use its own configuration.
+    
+    To set up Aider to use OpenRouter by default:
+    
+    ```bash
+    # Create or edit Aider's config file
+    mkdir -p ~/.config/aider
+    cat > ~/.config/aider/config.yaml << EOF
+    # Aider configuration for OpenRouter
+    openai_api_base: https://openrouter.ai/api/v1
+    openai_api_key: your_openrouter_api_key_here
+    model: anthropic/claude-3-7-sonnet  # or your preferred model
+    EOF
+    ```
+    
+    Alternatively, you can set these as environment variables in your shell profile:
+    ```bash
+    # Add to ~/.bashrc, ~/.zshrc, etc.
+    export OPENAI_API_BASE=https://openrouter.ai/api/v1
+    export OPENAI_API_KEY=your_openrouter_api_key_here
+    export AIDER_MODEL=anthropic/claude-3-7-sonnet
+    ```
+
+5.  **Make Scripts Executable**:
     ```bash
     chmod +x bin/dump_repo.sh
     chmod +x bin/launch_aiders.sh

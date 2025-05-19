@@ -177,8 +177,6 @@ def main(
         aider_global_context_files_rel = config.get('aider_global_context_files', [])
         aider_global_context_files_abs = [str(project_root / f) for f in aider_global_context_files_rel]
 
-        aider_model_config = config.get('aider_model')
-        
         # Resolve repo_context_file path if provided
         actual_repo_context_file = None
         if repo_context_file:
@@ -208,8 +206,7 @@ def main(
                     "guide_file": str(saved_guide_path_rel), # Path relative to project_root
                     "global_files": aider_global_context_files_rel, # Paths relative to project_root
                     "prompt": DEFAULT_AIDER_PROMPT,
-                    "description": f"Implement feature: {feature_info['name']}",
-                    "aider_model": aider_model_config # Add aider_model to task JSON
+                    "description": f"Implement feature: {feature_info['name']}"
                 })
         elif single_guide:
             print(f"Processing single pre-existing guide: {single_guide}")
@@ -219,8 +216,7 @@ def main(
                 "guide_file": str(single_guide_rel), # Path relative to project_root
                 "global_files": aider_global_context_files_rel, # Paths relative to project_root
                 "prompt": DEFAULT_AIDER_PROMPT,
-                "description": f"Implement guide: {single_guide.name}",
-                "aider_model": aider_model_config # Add aider_model to task JSON
+                "description": f"Implement guide: {single_guide.name}"
             })
         else:
             raise click.UsageError("Either --symphony-xml or --single-guide must be provided.")
