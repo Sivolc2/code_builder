@@ -1,9 +1,8 @@
 # feature_symphony_tool/src/utils.py
 import yaml
 import os
-import json
+import requests # Added for API calls
 from pathlib import Path
-import google.generativeai as genai
 from slugify import slugify  # from python-slugify import slugify
 
 class ConfigError(Exception):
@@ -22,60 +21,58 @@ def load_config(config_file_path: Path) -> dict:
     except yaml.YAMLError as e:
         raise ConfigError(f"Error parsing YAML configuration file: {config_file_path} - {e}")
 
-def get_gemini_api_key(config: dict) -> str:
-    """Retrieves Gemini API key from config or environment variable."""
-    api_key = config.get('gemini_api_key')
-    if not api_key:
-        api_key = os.environ.get('GEMINI_API_KEY')
+def get_openrouter_api_key() -> str:
+    """Retrieves OpenRouter API key from environment variable."""
+    # OpenRouter key MUST be set in environment for security
+    api_key = os.environ.get('OPENROUTER_API_KEY')
     
     if not api_key:
-        raise ConfigError("Gemini API key not found. Set 'gemini_api_key' in config or GEMINI_API_KEY environment variable.")
+        raise ConfigError("OpenRouter API key not found. Set the OPENROUTER_API_KEY environment variable.")
     return api_key
 
-def call_gemini_api(prompt_text: str, api_key: str, model_name: str) -> str:
+def call_openrouter_api(prompt_text: str, api_key: str, model_name: str) -> str:
     """
-    Calls the Gemini API with the given prompt and returns the text response.
+    Calls the OpenRouter API with the given prompt and returns the text response.
     """
-    print(f"\nCalling Gemini API with model: {model_name}...")
+    print(f"\nCalling OpenRouter API with model: {model_name}...")
     # print(f"Prompt (first 100 chars): {prompt_text[:100]}...")
 
-    genai.configure(api_key=api_key)
+    OPENROUTER_API_BASE = "https://openrouter.ai/api/v1"
     
-    generation_config = {
-        "temperature": 0.7,  # Adjust as needed for creativity vs. precision
-        "top_p": 1,
-        "top_k": 1,
-        "max_output_tokens": 8192,  # Max for gemini-1.5-pro
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+        # Optional: "X-Title": "Feature Symphony Tool" # Helps OpenRouter track usage
     }
     
-    safety_settings = [
-        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-    ]
-
     try:
-        model = genai.GenerativeModel(model_name=model_name,
-                                      generation_config=generation_config,
-                                      safety_settings=safety_settings)
+        response = requests.post(
+            f"{OPENROUTER_API_BASE}/chat/completions",
+            headers=headers,
+            json={
+                "model": model_name,
+                "messages": [{"role": "user", "content": prompt_text}],
+                "temperature": 0.7,
+                "max_tokens": 8000 # Use slightly less than context window max just in case
+            }
+        )
+        response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
         
-        response = model.generate_content(prompt_text)
+        response_data = response.json()
         
-        if response.candidates and response.candidates[0].content.parts:
-            generated_text = "".join(part.text for part in response.candidates[0].content.parts)
-            print("Gemini API call successful.")
+        if response_data and 'choices' in response_data and response_data['choices']:
+            generated_text = response_data['choices'][0]['message']['content']
+            print("OpenRouter API call successful.")
             return generated_text
         else:
-            # Check for blocked content due to safety settings or other reasons
-            if response.prompt_feedback and response.prompt_feedback.block_reason:
-                raise Exception(f"Gemini API call blocked. Reason: {response.prompt_feedback.block_reason_message or response.prompt_feedback.block_reason}")
-            raise Exception("Gemini API call failed: No content in response or unexpected response structure.")
+            # Print full response for debugging if no choices
+            print("OpenRouter API Response (Problem):", response_data)
+            raise Exception("OpenRouter API call failed: Unexpected response structure.")
 
     except Exception as e:
-        print(f"Error calling Gemini API: {e}")
-        raise  # Re-raise the exception to be caught by the orchestrator
+        print(f"Error calling OpenRouter API: {e}")
+        raise
 
 def generate_slug(text: str) -> str:
-    """Generates a URL-friendly slug from text."""
-    return slugify(text, max_length=50, word_boundary=True, separator="_") 
+    """Generates a URL-friendly slug from the given text."""
+    return slugify(text) 

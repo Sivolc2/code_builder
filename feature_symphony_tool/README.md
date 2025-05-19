@@ -1,49 +1,64 @@
 # Feature Symphony Tool
 
-This tool automates the process of breaking down large features into smaller, manageable slices, generating implementation guides for these slices using Google's Gemini API, and then launching Aider instances to implement these guides.
+This tool automates the process of breaking down large features into smaller, manageable slices, generating implementation guides for these slices using OpenRouter API, and then launching Aider instances to implement these guides.
 
-## Prerequisites
+## Prerequisites & Dependencies
 
 1.  **Python**: Version 3.8+
 2.  **Git**: For the `dump_repo.sh` script.
 3.  **tmux**: For running Aider instances in parallel. (e.g., `sudo apt install tmux` or `brew install tmux`)
 4.  **jq**: For parsing JSON in shell scripts. (e.g., `sudo apt install jq` or `brew install jq`)
 5.  **Aider**: Ensure `aider` is installed and configured. See Aider's documentation.
-6.  **Google Gemini API Key**: You'll need an API key for Gemini.
+6.  **OpenRouter API Key**: You'll need an API key from OpenRouter.
 
 ## Setup
 
 1.  **Clone/Place the Tool**:
     Place the `feature_symphony_tool` directory into your project or a preferred location.
 
-2.  **Configure the Tool**:
-    *   Navigate to the `feature_symphony_tool` directory.
+2.  **Install Dependencies**:
+    ```bash
+    cd feature_symphony_tool
+    pip install -r requirements.txt
+    ```
+
+3.  **Configure**:
     *   Copy `config/config.yaml.template` to `config/config.yaml`.
-    *   Edit `config/config.yaml` to set your `gemini_model_guide_generation`, `aider_global_context_files`, and `guides_output_directory` (relative to your main project root).
+    *   Edit `config/config.yaml` to set your `openrouter_model_guide_generation`, `aider_model`, `aider_global_context_files`, and `guides_output_directory` (relative to your main project root).
     *   Copy `.env.template` to `.env`.
-    *   Edit `.env` to add your `GEMINI_API_KEY`.
+    *   Edit `.env` to add your `OPENROUTER_API_KEY`.
         ```bash
         cd feature_symphony_tool
+        # (Ensure you are in the feature_symphony_tool directory)
         cp config/config.yaml.template config/config.yaml
         cp .env.template .env
         # Now edit config/config.yaml and .env with your details
         ```
 
-3.  **Python Virtual Environment (Recommended)**:
-    It's highly recommended to run the tool's Python scripts within a virtual environment. From the `feature_symphony_tool` directory:
-    ```bash
-    python3 -m venv .venv
-    source .venv/bin/activate  # On Linux/macOS
-    # .venv\Scripts\activate    # On Windows
-    pip install -r requirements.txt
-    ```
-    You'll need to activate this venv (`source .venv/bin/activate`) each time you want to run the tool scripts from a new terminal session if you are running them directly. The main wrapper scripts (`run_symphony.sh`, etc.) will attempt to handle this.
-
 4.  **Make Scripts Executable**:
-    Ensure the shell scripts are executable:
     ```bash
-    cd feature_symphony_tool
-    chmod +x bin/dump_repo.sh bin/launch_aiders.sh run_symphony.sh run_single_aider_task.sh
+    chmod +x bin/dump_repo.sh
+    chmod +x bin/launch_aiders.sh
+    chmod +x run_symphony.sh
+    chmod +x run_single_aider_task.sh
+    ```
+
+## Usage
+
+### Quick Start
+
+1.  First, run the repository dump script to create a context file for the LLM:
+    ```bash
+    cd your_project_root  # where your Git repository is
+    path/to/feature_symphony_tool/bin/dump_repo.sh
+    ```
+
+2.  Create a file (e.g., `my_feature_breakdown.xml`) containing your feature breakdown.
+
+3.  Run the feature symphony orchestrator:
+    ```bash
+    cd your_project_root  # where your Git repository is
+    path/to/feature_symphony_tool/run_symphony.sh path/to/my_feature_breakdown.xml
     ```
 
 ## `git dump` Script
@@ -51,51 +66,53 @@ This tool automates the process of breaking down large features into smaller, ma
 The `bin/dump_repo.sh` script creates a `repo_contents.txt` file in your project's root. This file contains a concatenated version of most files in your repository, which can be used as context for LLMs.
 
 **Usage**:
-Navigate to your main project's root directory (NOT `feature_symphony_tool` itself, unless that's your target project) and run:
 ```bash
+cd your_project_root
 path/to/feature_symphony_tool/bin/dump_repo.sh
 ```
-This will generate `repo_contents.txt` in your current directory (project root).
 
-You can create a Git alias for convenience (e.g., `git dump`) in your global or project-specific `.gitconfig`:
-```ini
-[alias]
-    dump = "!path/to/feature_symphony_tool/bin/dump_repo.sh"
+You can also customize the exclusion patterns in the script to skip certain file types or directories.
+
+Example of modifying exclusions:
+```bash
+# Open the script in an editor
+vim path/to/feature_symphony_tool/bin/dump_repo.sh
+# Edit the EXCLUDES array
 ```
 
 ## Workflow Overview
 
-1.  **Prepare Symphony XML**: Manually chat with Gemini (using `repo_contents.txt` as context if desired) to break down a large feature. Format the output as specified:
+1.  **Prepare Symphony XML**: Manually chat with an LLM (using `repo_contents.txt` as context if desired) to break down a large feature. Format the output as specified:
     ```xml
-    <!-- Save this as e.g., my_feature_breakdown.xml in your project -->
     <feature_symphony>
     [
         {
-            "name": "Implement User Authentication API",
-            "description": "Develop backend API endpoints for user registration, login, and logout using JWT."
+            "name": "Feature Slice 1 Name",
+            "description": "Feature Slice 1 Description"
         },
         {
-            "name": "Setup Database Schemas for Users",
-            "description": "Define and migrate database schemas for user profiles, credentials, and sessions."
+            "name": "Feature Slice 2 Name",
+            "description": "Feature Slice 2 Description"
         }
     ]
     </feature_symphony>
     ```
 
 2.  **Run Feature Symphony**:
-    From your main project root:
+    From your main project root (where your code and `.git` directory are):
     ```bash
     path/to/feature_symphony_tool/run_symphony.sh path/to/your/my_feature_breakdown.xml
     ```
 
-3.  **Monitor Aider**:
-    A `tmux` session will be created, and Aider instances will start working on each feature slice. You can attach to this session to monitor progress.
+3.  **Work with Aider**:
+    Once the Aider instances are launched in tmux:
+    *   Attach to the tmux session: `tmux attach-session -t symphony_aider_20230615_123456`.
+    *   Switch between windows (each running one Aider instance for one feature slice): `Ctrl+b <window number>`.
 
 ## Standalone Aider Task
 
-If you already have a feature guide and want to run Aider on it directly:
+If you already have a feature guide and want to run Aider on it directly from your project root:
+
 ```bash
 path/to/feature_symphony_tool/run_single_aider_task.sh path/to/your/feature_guide.md
-```
-
-This will create a single Aider instance in a tmux session to work on implementing that guide. 
+``` 

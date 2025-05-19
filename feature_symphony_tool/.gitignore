@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.egg-info/
-.env
+/.env # Use / to ensure only .env in the root of the tool is ignored
 *.egg
 dist/
 build/

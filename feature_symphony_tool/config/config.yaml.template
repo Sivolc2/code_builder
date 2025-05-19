@@ -1,16 +1,19 @@
 # feature_symphony_tool/config/config.yaml
 # Copy this to config.yaml and fill in your values.
 
-# Gemini API Configuration
-# Your Gemini API Key.
-# IMPORTANT: It's highly recommended to set this via the GEMINI_API_KEY environment variable
+# OpenRouter Configuration
+# Your OpenRouter API Key.
+# IMPORTANT: It's highly recommended to set this via the OPENROUTER_API_KEY environment variable
 # (e.g., in an .env file) instead of hardcoding it here for security.
-# If gemini_api_key is null or empty, the tool will expect GEMINI_API_KEY environment variable.
-gemini_api_key: null
+# The tool will ONLY use the OPENROUTER_API_KEY environment variable, this key here is ignored now.
+openrouter_api_key_in_env_required: true # Placeholder to remind user API key is needed via env
 
-# Gemini model to use for generating feature slice guides.
-# Example: "gemini-1.5-pro-latest", "gemini-pro"
-gemini_model_guide_generation: "gemini-1.5-pro-latest"
+# OpenRouter model to use for generating feature slice guides.
+# Example: "google/gemini-2.5-pro-preview", "openai/gpt-4o"
+openrouter_model_guide_generation: "google/gemini-2.5-pro-preview"
+
+# OpenRouter model for Aider tasks. Aider will use OPENROUTER_API_KEY and this model.
+aider_model: "openai/gpt-4o"
 
 # Aider Configuration
 # List of global context files to always include with Aider.

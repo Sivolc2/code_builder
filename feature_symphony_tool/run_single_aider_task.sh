@@ -23,102 +23,97 @@ TOOL_RUN_ARTIFACTS_DIR_NAME="" # Will be read from config
 
 # Check if running from project root
 if [ ! -d ".git" ]; then
-    echo "Warning: This script is intended to be run from your main project's root directory."
+  echo "Warning: This doesn't appear to be a git repository root."
+  echo "The feature_symphony_tool should be run from your project's root directory (where .git/ is)."
+  read -p "Continue anyway? (y/n) " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    exit 1
+  fi
 fi
 
-echo "Feature Slice Guide (Absolute): $FEATURE_SLICE_GUIDE_ABS_PATH"
-echo "Tool Root: $TOOL_ROOT"
-echo "Config File: $CONFIG_FILE_PATH"
+# Check if Python script exists
+if [ ! -f "$PYTHON_SCRIPT_PATH" ]; then
+  echo "Error: Python script not found at $PYTHON_SCRIPT_PATH"
+  exit 1
+fi
 
+# Check if guide file exists
 if [ ! -f "$FEATURE_SLICE_GUIDE_ABS_PATH" ]; then
-    echo "Error: Feature slice guide file not found at $FEATURE_SLICE_GUIDE_ABS_PATH"
-    exit 1
-fi
-if [ ! -f "$CONFIG_FILE_PATH" ]; then
-    echo "Error: Tool configuration file not found at $CONFIG_FILE_PATH"
-    echo "Please ensure 'config/config.yaml' exists in $TOOL_ROOT."
-    echo "You can copy 'config/config.yaml.template' to 'config/config.yaml' and edit it."
-    exit 1
+  echo "Error: Guide file not found at $FEATURE_SLICE_GUIDE_ABS_PATH"
+  exit 1
 fi
 
-# Activate Python virtual environment if it exists within the tool directory
-VENV_PATH="$TOOL_ROOT/.venv"
-if [ -d "$VENV_PATH" ]; then
-    echo "Activating Python virtual environment from $VENV_PATH..."
-    # shellcheck source=/dev/null
-    source "$VENV_PATH/bin/activate"
-else
-    echo "Warning: Python virtual environment not found at $VENV_PATH."
-    echo "Attempting to use system Python. Ensure dependencies from requirements.txt are installed."
+# Check for Python
+if ! command -v python3 &> /dev/null; then
+  echo "Error: python3 could not be found. Please install Python 3."
+  exit 1
 fi
 
-# Source .env file from tool directory if it exists
-ENV_FILE_PATH="$TOOL_ROOT/.env"
-if [ -f "$ENV_FILE_PATH" ]; then
-    echo "Sourcing environment variables from $ENV_FILE_PATH..."
-    set -a # Automatically export all variables
-    # shellcheck source=/dev/null
-    source "$ENV_FILE_PATH"
-    set +a
-else
-    echo "Info: .env file not found at $ENV_FILE_PATH. Relying on pre-set environment variables."
-fi
+# Get TOOL_RUN_ARTIFACTS_DIR_NAME from config
+TOOL_RUN_ARTIFACTS_DIR_NAME=$(grep -E "^tool_run_artifacts_dir:" "$CONFIG_FILE_PATH" | cut -d ":" -f2- | tr -d " \"'" || echo "runs")
+TOOL_RUN_ARTIFACTS_DIR="$TOOL_ROOT/$TOOL_RUN_ARTIFACTS_DIR_NAME"
 
-RUN_ID="single_task_$(date +"%Y%m%d_%H%M%S")"
-echo "Generated RUN_ID for single task: $RUN_ID"
+# Create a timestamped run ID
+RUN_ID="single_$(date +"%Y%m%d_%H%M%S")"
+echo "Run ID: $RUN_ID"
 
-# Determine tool's internal run artifacts directory from config
-# Using a simple grep/awk for now, Python would be more robust for YAML parsing
-TOOL_RUN_ARTIFACTS_DIR_NAME=$(grep "tool_run_artifacts_dir:" "$CONFIG_FILE_PATH" | awk '{print $2}' | tr -d '"' | tr -d "'")
-if [ -z "$TOOL_RUN_ARTIFACTS_DIR_NAME" ]; then
-    echo "Warning: 'tool_run_artifacts_dir' not found or empty in config. Defaulting to 'runs'."
-    TOOL_RUN_ARTIFACTS_DIR_NAME="runs"
-fi
-
-# Define where the orchestrator's JSON output will be stored
-SINGLE_TASK_JSON=""
+# Create run directory
 if [ -n "$TOOL_RUN_ARTIFACTS_DIR_NAME" ]; then
-    CURRENT_TOOL_RUN_DIR="$TOOL_ROOT/$TOOL_RUN_ARTIFACTS_DIR_NAME/$RUN_ID"
-    mkdir -p "$CURRENT_TOOL_RUN_DIR"
-    SINGLE_TASK_JSON="$CURRENT_TOOL_RUN_DIR/single_aider_task.json"
+  mkdir -p "$TOOL_RUN_ARTIFACTS_DIR/$RUN_ID"
+  SINGLE_TASK_JSON="$TOOL_RUN_ARTIFACTS_DIR/$RUN_ID/aider_tasks.json"
 else
-    SINGLE_TASK_JSON="$TOOL_ROOT/single_aider_task_${RUN_ID}.json"
-    echo "Warning: Storing orchestrator output JSON in $SINGLE_TASK_JSON as tool_run_artifacts_dir is not set."
+  SINGLE_TASK_JSON="$TOOL_ROOT/aider_tasks_$RUN_ID.json"
 fi
+
+# Setup environment (load .env if exists)
+ENV_FILE="$TOOL_ROOT/.env"
+if [ -f "$ENV_FILE" ]; then
+  echo "Loading environment variables from $ENV_FILE"
+  set -o allexport
+  source "$ENV_FILE"
+  set +o allexport
+fi
+
+# Setup Python virtual environment if it exists
+VENV_DIR="$TOOL_ROOT/.venv"
+if [ -d "$VENV_DIR" ] && [ -f "$VENV_DIR/bin/activate" ]; then
+  echo "Activating Python virtual environment at $VENV_DIR"
+  source "$VENV_DIR/bin/activate"
+fi
+
+# Print working directory for clarity
+echo "Project Root (where you ran the script): $(pwd)"
+echo "Tool Root: $TOOL_ROOT"
+echo "Feature Slice Guide: $FEATURE_SLICE_GUIDE_ABS_PATH"
+echo "Output JSON will be saved to: $SINGLE_TASK_JSON"
 
 echo "Calling Python orchestrator in single-guide mode..."
 python3 "$PYTHON_SCRIPT_PATH" \
+    --tool-root "$TOOL_ROOT" \
     --single-guide "$FEATURE_SLICE_GUIDE_ABS_PATH" \
     --config-file "$CONFIG_FILE_PATH" \
     --run-id "$RUN_ID" \
     --output-json-file "$SINGLE_TASK_JSON" \
     --project-root "$(pwd)"
 
-if [ $? -ne 0 ]; then
-    echo "Error: Python orchestrator script (single-guide mode) failed."
-    exit 1
-fi
-if [ ! -f "$SINGLE_TASK_JSON" ]; then
-    echo "Error: Orchestrator (single-guide mode) did not produce JSON output at $SINGLE_TASK_JSON."
-    exit 1
+exit_code=$?
+if [ $exit_code -ne 0 ]; then
+  echo "Error: Python orchestrator failed with exit code $exit_code"
+  exit $exit_code
 fi
 
-echo "Orchestrator finished. Single Aider task defined in: $SINGLE_TASK_JSON"
-echo "Launching Aider via tmux..."
+# Check if the output file exists and is not empty
+if [ ! -s "$SINGLE_TASK_JSON" ]; then
+  echo "Error: The output JSON file is empty or was not created."
+  exit 1
+fi
 
+echo "Launching Aider task..."
 bash "$LAUNCH_AIDERS_SCRIPT_PATH" "$RUN_ID" "$SINGLE_TASK_JSON"
 
-if [ $? -ne 0 ]; then
-    echo "Error: Aider launch script failed."
-    exit 1
-fi
-
-TMUX_SESSION_PREFIX=$(grep "tmux_session_prefix:" "$CONFIG_FILE_PATH" | awk '{print $2}' | tr -d '"' | tr -d "'")
-if [ -z "$TMUX_SESSION_PREFIX" ]; then 
-    TMUX_SESSION_PREFIX="symphony_aider" 
-fi
-
-echo "--- Standalone Aider Task Completed ---"
+echo "------------------------------------"
+echo "Standalone Aider Task Completed"
 echo "Aider agent should be running in a tmux session."
-echo "Attach to session (example): tmux attach-session -t ${TMUX_SESSION_PREFIX}_${RUN_ID}"
+echo "Attach to session with: tmux attach-session -t symphony_aider_$RUN_ID"
 echo "------------------------------------" 

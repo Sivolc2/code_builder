@@ -30,67 +30,59 @@ if [ ! -f "$TASKS_JSON_FILE" ]; then
 fi
 
 # Load tmux session name from JSON or default to a pattern
-TMUX_SESSION_NAME=$(jq -r '.tmux_session_name // "symphony_aider_'$RUN_ID'"' "$TASKS_JSON_FILE")
-TASK_COUNT=$(jq -r '.tasks | length' "$TASKS_JSON_FILE")
-
-echo "Will launch $TASK_COUNT Aider task(s) in tmux session: $TMUX_SESSION_NAME"
-
-# Check if session already exists
-if tmux has-session -t "$TMUX_SESSION_NAME" 2>/dev/null; then
-    echo "Error: tmux session '$TMUX_SESSION_NAME' already exists."
-    echo "Use 'tmux attach-session -t $TMUX_SESSION_NAME' to connect to it."
-    echo "Or kill the session with 'tmux kill-session -t $TMUX_SESSION_NAME' and try again."
-    exit 1
+TMUX_SESSION_NAME=$(jq -r '.tmux_session_name // empty' "$TASKS_JSON_FILE")
+if [ -z "$TMUX_SESSION_NAME" ]; then
+    TMUX_SESSION_PREFIX=$(jq -r '.tmux_session_prefix // "symphony_aider"' "$TASKS_JSON_FILE")
+    TMUX_SESSION_NAME="${TMUX_SESSION_PREFIX}_${RUN_ID}"
 fi
 
-# Create tmux session
-echo "Creating tmux session: $TMUX_SESSION_NAME"
-tmux new-session -d -s "$TMUX_SESSION_NAME" -n "dashboard"
+# Create a new tmux session without attaching to it
+tmux new-session -d -s "$TMUX_SESSION_NAME" -n "control" 2>/dev/null || {
+  echo "Session $TMUX_SESSION_NAME already exists. Using existing session."
+}
 
-# Add a dashboard window with task information
-tmux send-keys -t "$TMUX_SESSION_NAME:dashboard" "echo 'Feature Symphony Dashboard - Run ID: $RUN_ID'" C-m
-tmux send-keys -t "$TMUX_SESSION_NAME:dashboard" "echo '----------------------------------------'" C-m
-tmux send-keys -t "$TMUX_SESSION_NAME:dashboard" "echo 'Tasks: $TASK_COUNT'" C-m
-tmux send-keys -t "$TMUX_SESSION_NAME:dashboard" "echo 'Tasks JSON: $TASKS_JSON_FILE'" C-m
-tmux send-keys -t "$TMUX_SESSION_NAME:dashboard" "echo ''" C-m
-tmux send-keys -t "$TMUX_SESSION_NAME:dashboard" "echo 'Task List:'" C-m
-tmux send-keys -t "$TMUX_SESSION_NAME:dashboard" "jq -r '.tasks[] | \"* \" + .description + \" (\" + .guide_file + \")\"' \"$TASKS_JSON_FILE\"" C-m
-tmux send-keys -t "$TMUX_SESSION_NAME:dashboard" "echo ''" C-m
-tmux send-keys -t "$TMUX_SESSION_NAME:dashboard" "echo 'Navigate between windows: Ctrl+b <window number>'" C-m
-tmux send-keys -t "$TMUX_SESSION_NAME:dashboard" "echo 'Detach from session: Ctrl+b d'" C-m
+# Get the number of tasks
+TASK_COUNT=$(jq '.tasks | length' "$TASKS_JSON_FILE")
 
-# Launch each Aider task in its own window
-for ((i=0; i<TASK_COUNT; i++)); do
-    # Extract info for this task
-    TASK_INFO=$(jq -r ".tasks[$i]" "$TASKS_JSON_FILE")
+# Process each task
+for (( i=0; i<$TASK_COUNT; i++ ))
+do
+    # Get task info from JSON
+    TASK_INFO=$(jq -c ".tasks[$i]" "$TASKS_JSON_FILE")
     GUIDE_FILE=$(echo "$TASK_INFO" | jq -r '.guide_file')
     PROMPT=$(echo "$TASK_INFO" | jq -r '.prompt')
     DESCRIPTION=$(echo "$TASK_INFO" | jq -r '.description')
+    AIDER_TASK_MODEL=$(echo "$TASK_INFO" | jq -r '.aider_model // empty') # Get aider_model from task or empty string
     # Convert global_files array to a space-separated string
     GLOBAL_FILES=$(echo "$TASK_INFO" | jq -r '.global_files | join(" ")')
     
-    # Use task number+1 for window index (since dashboard is 0)
+    # Incrementally create new tmux windows for each task
     WINDOW_NUM=$((i+1))
-    WINDOW_NAME="task-$WINDOW_NUM"
-    
-    echo "Setting up window $WINDOW_NUM for task: $DESCRIPTION"
+    WINDOW_NAME="task_$WINDOW_NUM"
     
     # Create a new window for this task
     tmux new-window -t "$TMUX_SESSION_NAME:$WINDOW_NUM" -n "$WINDOW_NAME"
     
     # Build the Aider command
     # The --yes flag prevents Aider from asking for confirmation
-    AIDER_CMD="aider $GUIDE_FILE $GLOBAL_FILES --message \"$PROMPT\" --yes"
+    # Set AIDER_MODEL environment variable for this specific aider process if specified in the task JSON
+    AIDER_CMD=""
+    if [ -n "$AIDER_TASK_MODEL" ]; then
+        # Prepend environment variable setting for this command
+        AIDER_CMD="AIDER_MODEL=\"$AIDER_TASK_MODEL\" aider $GUIDE_FILE $GLOBAL_FILES --message \"$PROMPT\" --yes"
+    else
+        # Use default aider behavior (will pick from its own config/env)
+        AIDER_CMD="aider $GUIDE_FILE $GLOBAL_FILES --message \"$PROMPT\" --yes"
+    fi
     
     # Send command to the tmux window
-    tmux send-keys -t "$TMUX_SESSION_NAME:$WINDOW_NAME" "echo 'Task $WINDOW_NUM: $DESCRIPTION'" C-m
-    tmux send-keys -t "$TMUX_SESSION_NAME:$WINDOW_NAME" "echo 'Guide: $GUIDE_FILE'" C-m
-    tmux send-keys -t "$TMUX_SESSION_NAME:$WINDOW_NAME" "echo 'Global Context Files: $GLOBAL_FILES'" C-m
-    tmux send-keys -t "$TMUX_SESSION_NAME:$WINDOW_NAME" "echo 'Executing: $AIDER_CMD'" C-m
-    tmux send-keys -t "$TMUX_SESSION_NAME:$WINDOW_NAME" "$AIDER_CMD" C-m
+    tmux send-keys -t "$TMUX_SESSION_NAME:$WINDOW_NUM" "echo 'Task $WINDOW_NUM: $DESCRIPTION'" C-m
+    tmux send-keys -t "$TMUX_SESSION_NAME:$WINDOW_NUM" "echo 'Guide: $GUIDE_FILE'" C-m
+    tmux send-keys -t "$TMUX_SESSION_NAME:$WINDOW_NUM" "echo 'Running Aider...'" C-m
+    tmux send-keys -t "$TMUX_SESSION_NAME:$WINDOW_NUM" "$AIDER_CMD" C-m
 done
 
 echo "All Aider tasks launched in tmux session: $TMUX_SESSION_NAME"
-echo "To attach to the session, run: tmux attach-session -t $TMUX_SESSION_NAME"
+echo "To attach to the session, run: 'tmux attach-session -t $TMUX_SESSION_NAME'"
 echo "To detach from the session (once attached): Ctrl+b d"
 echo "To switch between windows once attached: Ctrl+b <window number>" 
