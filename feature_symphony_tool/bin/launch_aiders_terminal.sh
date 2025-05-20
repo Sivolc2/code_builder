@@ -115,7 +115,7 @@ echo "--------------------------------------"
 EOSCRIPT
 
     # Add the actual aider command with proper quoting
-    echo "aider \"$GUIDE_FILE\" $GLOBAL_FILES --message \"$PROMPT_RAW\" --yes" >> "$TERMINAL_SCRIPT"
+    echo "aider \"$GUIDE_FILE\" $GLOBAL_FILES --message \"$PROMPT_RAW\" --yes --no-auto-commits" >> "$TERMINAL_SCRIPT"
     
     # Add the post-command text
     cat >> "$TERMINAL_SCRIPT" << 'EOSCRIPT'

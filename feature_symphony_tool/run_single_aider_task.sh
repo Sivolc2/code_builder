@@ -133,6 +133,6 @@ else
   echo "Error: This script is designed for macOS with AppleScript support."
   echo "On other platforms, you should run Aider directly:"
   echo "  cd $(pwd)"
-  echo "  aider docs/feature_guides/your_guide.md --message \"Your prompt\""
+  echo "  aider docs/feature_guides/your_guide.md --message \"Your prompt\" --no-auto-commits"
 fi
 echo "------------------------------------" 

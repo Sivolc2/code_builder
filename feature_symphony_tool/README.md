@@ -199,18 +199,18 @@ vim path/to/feature_symphony_tool/bin/dump_repo.sh
 
 1.  **Prepare Symphony XML**: Manually chat with an LLM (using `repo_contents.txt` as context if desired) to break down a large feature. Format the output as specified:
     ```xml
-    <feature_symphony>
-    [
-        {
-            "name": "Feature Slice 1 Name",
-            "description": "Feature Slice 1 Description"
-        },
-        {
-            "name": "Feature Slice 2 Name",
-            "description": "Feature Slice 2 Description"
-        }
-    ]
-    </feature_symphony>
+<feature_symphony>
+[
+    {
+        "name": "Feature Name",
+        "description": "Feature Description"
+    },
+    {
+        "name": "Another Feature Name",
+        "description": "Another Feature Description"
+    }
+]
+</feature_symphony>
     ```
 
 2.  **Run Feature Symphony**:
