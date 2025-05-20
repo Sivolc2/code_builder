@@ -67,6 +67,7 @@ This tool automates the process of breaking down large features into smaller, ma
     chmod +x bin/launch_aiders_zellij.sh
     chmod +x run_symphony.sh
     chmod +x run_single_aider_task.sh
+    chmod +x generate_guides.sh
     ```
 
 ## Usage
@@ -79,28 +80,63 @@ This tool automates the process of breaking down large features into smaller, ma
     path/to/feature_symphony_tool/bin/dump_repo.sh
     ```
 
-2.  Create a file (e.g., `my_feature_breakdown.xml`) containing your feature breakdown.
-
-3.  Run the feature symphony orchestrator:
-    ```bash
-    cd your_project_root  # where your Git repository is
-    path/to/feature_symphony_tool/run_symphony.sh path/to/my_feature_breakdown.xml
+2.  Create a file (e.g., `my_feature_breakdown.txt`) containing your feature breakdown within `<feature_symphony>` tags:
+    ```
+    <feature_symphony>
+    [
+        {
+            "name": "User Authentication",
+            "description": "Implement user login, registration, and session management"
+        },
+        {
+            "name": "Password Reset",
+            "description": "Add password reset functionality with email verification"
+        }
+    ]
+    </feature_symphony>
     ```
 
-    **Multi-threading for Guide Generation**:
-    The `orchestrator.py` script supports a `--threads N` option to generate feature slice guides in parallel.
-    To use this, you can modify the `run_symphony.sh` script directly. For example, change the line:
-    `python3 "$PYTHON_SCRIPT_PATH" \`
-    to include the threads option:
-    `python3 "$PYTHON_SCRIPT_PATH" --threads 4 \` (to use 4 threads)
-    The default is 1 thread (sequential processing). This option is only relevant when processing a full symphony XML.
+3.  To generate feature guides without running Aider:
+    ```bash
+    cd your_project_root  # where your Git repository is
+    path/to/feature_symphony_tool/generate_guides.sh path/to/my_feature_breakdown.txt
+    ```
 
-3.  **Monitor Aider Tasks (macOS)**:
-    *   This tool will open a **new Terminal window for each Aider task** when running on macOS.
-    *   Each Terminal window will contain its own dedicated Zellij session running one Aider instance.
-    *   You can interact with each Aider instance in its respective window.
-    *   To close a specific Aider task, you can type `exit` or `Ctrl+D` in its Zellij pane, or simply close the Terminal window.
-    *   Zellij sessions are named like `symphony_aider_RUNID_taskN_description`. You can list them with `zellij list-sessions` and attach manually if needed, e.g., `zellij attach session_name`.
+4.  To generate guides and launch Aider instances to implement them:
+    ```bash
+    cd your_project_root  # where your Git repository is
+    path/to/feature_symphony_tool/run_symphony.sh path/to/my_feature_breakdown.txt
+    ```
+
+### Command-Line Options
+
+Both `generate_guides.sh` and `run_symphony.sh` support the following command-line options:
+
+* **--threads N**: Number of threads for parallel guide generation (default: 1)
+* **--output-dir DIR**: Directory to save guides (overrides the config setting)
+* **--model MODEL**: OpenRouter model to use (overrides the config setting)
+* **--context-files FILE1 [FILE2...]**: Additional context files (space-separated list)
+
+Examples:
+
+```bash
+# Generate guides with 4 threads
+./feature_symphony_tool/generate_guides.sh my_feature_breakdown.txt --threads 4
+
+# Generate guides using a custom model and output directory
+./feature_symphony_tool/generate_guides.sh my_feature_breakdown.txt --model anthropic/claude-3-opus --output-dir custom/guides
+
+# Generate guides and run Aider with additional context files
+./feature_symphony_tool/run_symphony.sh my_feature_breakdown.txt --context-files docs/architecture.md src/main.py
+```
+
+### Monitor Aider Tasks (macOS)
+
+*   This tool will open a **new Terminal window for each Aider task** when running on macOS.
+*   Each Terminal window will contain its own dedicated Zellij session running one Aider instance.
+*   You can interact with each Aider instance in its respective window.
+*   To close a specific Aider task, you can type `exit` or `Ctrl+D` in its Zellij pane, or simply close the Terminal window.
+*   Zellij sessions are named like `symphony_aider_RUNID_taskN_description`. You can list them with `zellij list-sessions` and attach manually if needed, e.g., `zellij attach session_name`.
 
 ### Example Commands
 
@@ -133,8 +169,8 @@ Here are some practical examples of how to use the tool:
 
 3. **Create a Feature Breakdown**:
    ```bash
-   # Create a new XML file for your feature breakdown
-   cat > my_feature_breakdown.xml << EOF
+   # Create a new file for your feature breakdown
+   cat > my_feature_breakdown.txt << EOF
    <feature_symphony>
    [
        {
@@ -150,13 +186,25 @@ Here are some practical examples of how to use the tool:
    EOF
    ```
 
-4. **Run Full Feature Symphony**:
+4. **Generate Only Feature Guides**:
    ```bash
    # From your project root
-   ./feature_symphony_tool/run_symphony.sh my_feature_breakdown.xml
+   ./feature_symphony_tool/generate_guides.sh my_feature_breakdown.txt
+   
+   # With custom options
+   ./feature_symphony_tool/generate_guides.sh my_feature_breakdown.txt --model anthropic/claude-3-opus --output-dir custom/guides
    ```
 
-5. **Run Single Feature Guide**:
+5. **Run Full Feature Symphony (Generate Guides + Launch Aider)**:
+   ```bash
+   # From your project root
+   ./feature_symphony_tool/run_symphony.sh my_feature_breakdown.txt
+   
+   # With custom options
+   ./feature_symphony_tool/run_symphony.sh my_feature_breakdown.txt --threads 4 --context-files docs/architecture.md
+   ```
+
+6. **Run Single Feature Guide**:
    ```bash
    # If you have a pre-existing guide
    ./feature_symphony_tool/run_single_aider_task.sh docs/feature_guides/feature_slice_guide_user_authentication.md
@@ -173,7 +221,7 @@ Here are some practical examples of how to use the tool:
    cd ..
 
    # Now run the tool
-   ./feature_symphony_tool/run_symphony.sh my_feature_breakdown.xml
+   ./feature_symphony_tool/generate_guides.sh my_feature_breakdown.txt
    ```
 
 ## `git dump` Script
@@ -197,8 +245,8 @@ vim path/to/feature_symphony_tool/bin/dump_repo.sh
 
 ## Workflow Overview
 
-1.  **Prepare Symphony XML**: Manually chat with an LLM (using `repo_contents.txt` as context if desired) to break down a large feature. Format the output as specified:
-    ```xml
+1.  **Prepare Symphony File**: Manually chat with an LLM (using `repo_contents.txt` as context if desired) to break down a large feature. Format the output within feature_symphony tags:
+    ```
 <feature_symphony>
 [
     {
@@ -213,10 +261,16 @@ vim path/to/feature_symphony_tool/bin/dump_repo.sh
 </feature_symphony>
     ```
 
-2.  **Run Feature Symphony**:
+2.  **Generate Feature Guides Only**:
     From your main project root (where your code and `.git` directory are):
     ```bash
-    path/to/feature_symphony_tool/run_symphony.sh path/to/your/my_feature_breakdown.xml
+    path/to/feature_symphony_tool/generate_guides.sh path/to/your/my_feature_breakdown.txt
+    ```
+
+3.  **Run Feature Symphony with Aider**:
+    From your main project root (where your code and `.git` directory are):
+    ```bash
+    path/to/feature_symphony_tool/run_symphony.sh path/to/your/my_feature_breakdown.txt
     ```
 
 ## Standalone Aider Task

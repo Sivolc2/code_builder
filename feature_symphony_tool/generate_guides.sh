@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR_SYMPHONY="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-TOOL_ROOT="$SCRIPT_DIR_SYMPHONY" # Assuming this script is in feature_symphony_tool/
+SCRIPT_DIR_GUIDES="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+TOOL_ROOT="$SCRIPT_DIR_GUIDES" # Assuming this script is in feature_symphony_tool/
 
-echo "--- Feature Symphony Orchestrator ---"
+echo "--- Feature Symphony Guide Generator ---"
 
 # Show usage if no parameters or --help
 if [[ $# -lt 1 || "$1" == "--help" ]]; then
@@ -118,7 +118,6 @@ fi
 
 CONFIG_FILE_PATH="$TOOL_ROOT/config/config.yaml"
 PYTHON_SCRIPT_PATH="$TOOL_ROOT/src/orchestrator.py"
-LAUNCH_AIDERS_SCRIPT_PATH="$TOOL_ROOT/bin/launch_aiders_terminal.sh"
 TOOL_RUN_ARTIFACTS_DIR_NAME="" # Will be read from config
 
 # Ensure we're run from project root
@@ -162,16 +161,20 @@ TOOL_RUN_ARTIFACTS_DIR_NAME=$(grep -E "^tool_run_artifacts_dir:" "$CONFIG_FILE_P
 TOOL_RUN_ARTIFACTS_DIR="$TOOL_ROOT/$TOOL_RUN_ARTIFACTS_DIR_NAME"
 
 # Create a timestamped run ID
-RUN_ID=$(date +"%Y%m%d_%H%M%S")
+RUN_ID="guides_$(date +"%Y%m%d_%H%M%S")"
 echo "Run ID: $RUN_ID"
 
 # Create run directory
 if [ -n "$TOOL_RUN_ARTIFACTS_DIR_NAME" ]; then
   mkdir -p "$TOOL_RUN_ARTIFACTS_DIR/$RUN_ID"
-  AIDER_TASKS_JSON_PATH="$TOOL_RUN_ARTIFACTS_DIR/$RUN_ID/aider_tasks.json"
+  AIDER_TASKS_JSON_PATH="$TOOL_RUN_ARTIFACTS_DIR/$RUN_ID/guides_info.json"
 else
-  AIDER_TASKS_JSON_PATH="$TOOL_ROOT/aider_tasks_$RUN_ID.json"
+  AIDER_TASKS_JSON_PATH="$TOOL_ROOT/guides_info_$RUN_ID.json"
 fi
+
+# Read guides output directory from config
+GUIDES_OUTPUT_DIR_REL=$(grep -E "^guides_output_directory:" "$CONFIG_FILE_PATH" | cut -d ":" -f2- | tr -d " \"'" || echo "docs/feature_guides")
+GUIDES_OUTPUT_DIR_ABS="$(pwd)/$GUIDES_OUTPUT_DIR_REL"
 
 # Setup environment (load .env if exists)
 ENV_FILE="$TOOL_ROOT/.env"
@@ -194,8 +197,12 @@ echo "Project Root (where you ran the script): $(pwd)"
 echo "Tool Root: $TOOL_ROOT"
 echo "Symphony File: $SYMPHONY_FILE_ABS_PATH"
 echo "Output JSON will be saved to: $AIDER_TASKS_JSON_PATH"
+echo "Guides will be saved to: $GUIDES_OUTPUT_DIR_ABS"
 
-echo "Running Python orchestrator to generate slice guides and Aider tasks..."
+# Create guides directory if it doesn't exist
+mkdir -p "$GUIDES_OUTPUT_DIR_ABS"
+
+echo "Running Python orchestrator to generate slice guides..."
 # CWD for orchestrator.py will be the project root.
 python3 "$PYTHON_SCRIPT_PATH" \
     --tool-root "$TOOL_ROOT" \
@@ -219,12 +226,8 @@ if [ ! -s "$AIDER_TASKS_JSON_PATH" ]; then
   exit 1
 fi
 
-echo "Launching Aider tasks..."
-bash "$LAUNCH_AIDERS_SCRIPT_PATH" "$RUN_ID" "$AIDER_TASKS_JSON_PATH"
-
 echo "-----------------------------------"
-echo "Feature Symphony Orchestration Complete!"
-echo "Aider agents are now running in separate Terminal windows."
-echo "Look for the new Terminal windows with task IDs related to run: $RUN_ID"
-echo "Each window will remain open after its task completes for your review."
+echo "Feature Symphony Guide Generation Complete!"
+echo "Feature guides have been generated in: $GUIDES_OUTPUT_DIR_ABS"
+echo "NOTE: Aider tasks will NOT be launched - this script only generates guides."
 echo "-----------------------------------" 

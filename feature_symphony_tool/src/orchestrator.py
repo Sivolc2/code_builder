@@ -1,5 +1,4 @@
 # feature_symphony_tool/src/orchestrator.py
-import xml.etree.ElementTree as ET
 import json
 import os
 import click
@@ -18,17 +17,30 @@ from src.utils import load_config, get_openrouter_api_key, call_openrouter_api, 
 DEFAULT_AIDER_PROMPT = "Please implement this guide."
 
 def parse_symphony_xml(xml_filepath: Path) -> list[dict]:
-    """Parses the feature symphony XML file and extracts feature details."""
+    """Parses the feature symphony file and extracts feature details.
+    
+    The file should contain a JSON array of feature objects within 
+    <feature_symphony>...</feature_symphony> tags.
+    """
     try:
-        print(f"Parsing symphony XML file: {xml_filepath}")
-        tree = ET.parse(xml_filepath)
-        root = tree.getroot()
+        print(f"Parsing symphony file: {xml_filepath}")
         
-        if root.tag != "feature_symphony":
-            raise ValueError(f"Invalid XML format. Root element should be 'feature_symphony', got '{root.tag}'")
+        # Read the entire file as text
+        with open(xml_filepath, 'r') as f:
+            file_content = f.read()
         
-        # The content is expected to be a JSON array inside the XML
-        json_content = root.text.strip() if root.text else "[]"
+        # Extract content between <feature_symphony> and </feature_symphony> tags
+        start_tag = "<feature_symphony>"
+        end_tag = "</feature_symphony>"
+        
+        start_index = file_content.find(start_tag)
+        end_index = file_content.find(end_tag)
+        
+        if start_index == -1 or end_index == -1:
+            raise ValueError(f"Invalid file format. Could not find <feature_symphony> tags in {xml_filepath}")
+        
+        # Extract the JSON content (including the tags length)
+        json_content = file_content[start_index + len(start_tag):end_index].strip()
         
         # Parse the JSON array
         features = json.loads(json_content)
@@ -46,14 +58,11 @@ def parse_symphony_xml(xml_filepath: Path) -> list[dict]:
                 raise ValueError(f"Feature at index {i} is missing 'description' property")
         
         return features
-    except ET.ParseError as e:
-        print(f"Error parsing XML: {e}")
-        raise
     except json.JSONDecodeError as e:
-        print(f"Error parsing JSON content within XML: {e}")
+        print(f"Error parsing JSON content: {e}")
         raise
     except Exception as e:
-        print(f"Unexpected error parsing symphony XML: {e}")
+        print(f"Unexpected error parsing symphony file: {e}")
         raise
 
 
@@ -63,7 +72,8 @@ def generate_feature_slice_guide(
     openrouter_model: str,
     project_root: Path,
     repo_context_file: Path = None, # Optional repo_contents.txt
-    tool_root: Path = None # Optional path to the tool's root dir
+    tool_root: Path = None, # Optional path to the tool's root dir
+    additional_contexts: list[Path] = []
 ) -> str:
     """Generates a detailed implementation guide for a single feature slice using OpenRouter."""
     feature_name = feature_info["name"]
@@ -78,6 +88,15 @@ def generate_feature_slice_guide(
         context_text = f"\n\n--- Repository Context ---\n{repo_context_file.read_text()}\n--- End Repository Context ---"
     elif repo_context_file:
         print(f"Warning: Specified repository context file not found: {repo_context_file} (Absolute: {project_root / repo_context_file})")
+
+    # Include additional context files
+    additional_context_text = ""
+    for context_file in additional_contexts:
+        if context_file.exists():
+            print(f"Including additional context from: {context_file}")
+            additional_context_text += f"\n\n--- Additional Context ---\n{context_file.read_text()}\n--- End Additional Context ---"
+        else:
+            print(f"Warning: Specified additional context file not found: {context_file} (Absolute: {project_root / context_file})")
 
     prompt = f"""
 You are an expert software architect and senior developer. Your task is to generate a detailed, step-by-step implementation guide for the following software feature. This guide will be used by an AI coding assistant (Aider) to implement the feature.
@@ -97,6 +116,7 @@ Make your guide as specific and actionable as possible. Assume the AI coding ass
 
 The guide should be comprehensive and self-contained so the AI can implement the feature with minimal additional input.
 {context_text}
+{additional_context_text}
 
 Begin the guide now:
 """
@@ -143,10 +163,13 @@ def prepare_aider_tasks_json(
 @click.option('--output-json-file', required=True, type=click.Path(dir_okay=False, writable=True, path_type=Path), help="Path to save the output Aider tasks JSON file.")
 @click.option('--project-root', required=True, type=click.Path(exists=True, file_okay=False, path_type=Path), help="Absolute path to the root of the target project where Aider will run.")
 @click.option('--tool-root', required=True, type=click.Path(exists=True, file_okay=False, path_type=Path), help="Absolute path to the root of the feature_symphony_tool directory.")
-@click.option('--symphony-xml', type=click.Path(exists=True, dir_okay=False, path_type=Path), help="Path to the symphony XML file (for full workflow).")
+@click.option('--symphony-xml', type=click.Path(exists=True, dir_okay=False, path_type=Path), help="Path to the symphony feature file (for full workflow).")
 @click.option('--single-guide', type=click.Path(exists=True, dir_okay=False, path_type=Path), help="Path to a pre-existing single feature slice guide (for single task workflow).")
 @click.option('--repo-context-file', type=click.Path(exists=False, dir_okay=False, path_type=Path), default=None, help="Optional path to a repo_contents.txt file for additional context during guide generation. Relative to project_root.")
 @click.option('--threads', type=int, default=1, help="Number of threads for parallel guide generation.", show_default=True)
+@click.option('--guides-output-dir', type=click.Path(file_okay=False, path_type=Path), default=None, help="Directory to save generated guides (overrides config value). Relative to project_root.")
+@click.option('--model', type=str, default=None, help="OpenRouter model to use for guide generation (overrides config value).")
+@click.option('--additional-context-files', type=str, multiple=True, help="Additional files to include as context. Relative to project_root.")
 def main(
     config_file: Path, 
     run_id: str, 
@@ -156,9 +179,12 @@ def main(
     symphony_xml: Path, 
     single_guide: Path,
     repo_context_file: Path,
-    threads: int
+    threads: int,
+    guides_output_dir: Path,
+    model: str,
+    additional_context_files: list[str]
 ):
-    """Feature Symphony Orchestrator - Processes feature symphony XML and generates implementation guides."""
+    """Feature Symphony Orchestrator - Processes feature symphony file and generates implementation guides."""
     try:
         print(f"Feature Symphony Orchestrator")
         print(f"Run ID: {run_id}")
@@ -171,10 +197,13 @@ def main(
         if not openrouter_api_key:
             raise ConfigError("OPENROUTER_API_KEY environment variable not set.")
             
-        openrouter_model_guide = config.get('openrouter_model_guide_generation', 'google/gemini-1.5-pro-latest')
+        # Use CLI model if provided, otherwise use config value
+        openrouter_model_guide = model if model else config.get('openrouter_model_guide_generation', 'google/gemini-1.5-pro-latest')
+        print(f"Using OpenRouter model: {openrouter_model_guide}")
         
         # Output directory for guides, relative to the project_root
-        guides_output_dir_rel = config.get('guides_output_directory', 'docs/feature_guides')
+        # Use CLI guides_output_dir if provided, otherwise use config value
+        guides_output_dir_rel = guides_output_dir if guides_output_dir else config.get('guides_output_directory', 'docs/feature_guides')
         guides_output_dir_abs = project_root / guides_output_dir_rel
         print(f"Guides output directory: {guides_output_dir_abs}")
         
@@ -191,6 +220,16 @@ def main(
             actual_repo_context_file = project_root / repo_context_file
             print(f"Repository context file: {actual_repo_context_file}")
         
+        # Process additional context files
+        additional_contexts = []
+        for context_file in additional_context_files:
+            context_path = project_root / context_file
+            if context_path.exists():
+                additional_contexts.append(context_path)
+                print(f"Additional context file: {context_path}")
+            else:
+                print(f"Warning: Additional context file not found: {context_path}")
+        
         # List to collect Aider task definitions
         aider_tasks = []
         
@@ -198,7 +237,7 @@ def main(
         if symphony_xml:
             if threads <= 0:
                 threads = 1
-            print(f"Processing symphony XML: {symphony_xml} with {threads} thread(s)")
+            print(f"Processing symphony file: {symphony_xml} with {threads} thread(s)")
             features = parse_symphony_xml(symphony_xml)
             
             generated_guides_data = [] # To store (feature_info, guide_content)
@@ -220,7 +259,9 @@ def main(
                             openrouter_api_key,
                             openrouter_model_guide,
                             project_root,
-                            actual_repo_context_file
+                            actual_repo_context_file,
+                            tool_root,
+                            additional_contexts
                         )
                         future_to_feature[future] = feature_info
                         
@@ -244,7 +285,9 @@ def main(
                             openrouter_api_key,
                             openrouter_model_guide,
                             project_root,
-                            actual_repo_context_file
+                            actual_repo_context_file,
+                            tool_root,
+                            additional_contexts
                         )
                         print(f"Completed guide generation for: {feature_info['name']}")
                         generated_guides_data.append((feature_info, guide_content))
