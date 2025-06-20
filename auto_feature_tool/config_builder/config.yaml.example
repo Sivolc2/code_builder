@@ -1,0 +1,45 @@
+# auto_feature_tool/config_builder/config.yaml.example
+# Configuration for AI Feature Implementation Script
+# -----------------------------------------------------------------------------
+# Copy this file to 'config.yaml' in the same directory (auto_feature_tool/config_builder/)
+# and customize the values.
+# IMPORTANT: Ensure 'auto_feature_tool/config_builder/config.yaml' is in your .gitignore
+# -----------------------------------------------------------------------------
+
+# --- OpenRouter API Configuration ---
+openrouter:
+  api_key: "YOUR_OPENROUTER_API_KEY_HERE"
+  # Model to use for generating implementation guides (via OpenRouter)
+  # Example: "google/gemini-1.5-pro-latest", "openai/gpt-4o", "anthropic/claude-3-opus"
+  # The user's request specified "google/gemini-2.5-pro". Ensure this model identifier is correct on OpenRouter.
+  gemini_model: "google/gemini-2.5-pro" # Verify this model string on OpenRouter
+
+  # Optional headers for OpenRouter API calls (helps your app appear on leaderboards)
+  site_url: "<YOUR_SITE_URL_OR_PROJECT_URL>" # e.g., https://yourproject.com
+  site_name: "<YOUR_APP_OR_PROJECT_NAME>"    # e.g., MyProject FeatureGen
+
+# --- File Path Configurations (relative to the project root) ---
+# These paths are interpreted relative to the directory where auto_feature.sh is run (i.e., your project root).
+paths:
+  project_context: "project_context.md"
+  repo_contents: "repo_contents.txt"
+  features_file: "features_to_implement.txt"
+  # Path to the CLAUDE_AGENT_RULES.md file.
+  claude_rules: "auto_feature_tool/CLAUDE_AGENT_RULES.md"
+  # Directory where generated implementation guides will be stored.
+  guides_dir: "docs/guides"
+  # Directory for temporary Claude slash commands (relative to project root).
+  # claude-code usually looks for .claude/commands in the current working directory.
+  claude_temp_commands_dir: ".claude/commands"
+
+# --- Script Behavior ---
+script_behavior:
+  # Set to true to pause the script for human review after each feature is implemented by Claude.
+  # Set to false for fully autonomous operation.
+  human_review: false
+
+# --- Claude Code Configuration ---
+claude_code:
+  # Path to the claude CLI executable, if not in system PATH or if you want to specify one.
+  # Default is "claude", assuming it's in PATH.
+  cli_path: "claude" 

@@ -35,6 +35,9 @@ For each feature in a provided list:
 - **`jq`**: Required for parsing JSON responses
   - Ubuntu/Debian: `sudo apt-get install jq`
   - macOS: `brew install jq`
+- **`yq`**: Required for parsing YAML configuration
+  - Installation: Visit [https://github.com/mikefarah/yq#install](https://github.com/mikefarah/yq#install) for instructions
+  - Common methods: `brew install yq` (macOS), `sudo snap install yq` (Linux), or download binary
 - **OpenRouter API Key**: Obtain from [OpenRouter.ai](https://openrouter.ai)
 - **`git dump` (or equivalent)**: You need a command that produces a `repo_contents.txt` file at the root of your project
 
@@ -43,10 +46,10 @@ For each feature in a provided list:
 1. **Copy Tool Files**: Copy the `auto_feature_tool/` directory into your project's root.
 
 2. **Configure**: 
-   - Navigate to the `auto_feature_tool/` directory
-   - Copy `config.sh.example` to `config.sh`
-   - Edit `config.sh` and fill in your `OPENROUTER_API_KEY`, paths, model preferences, etc.
-   - **Important**: The provided `.gitignore` already excludes `auto_feature_tool/config.sh` to protect your API key
+   - Navigate to the `auto_feature_tool/config_builder/` directory
+   - Copy `config.yaml.example` to `config.yaml`
+   - Edit `config.yaml` and fill in your `openrouter.api_key`, `paths`, model preferences, etc.
+   - **Important**: Ensure `auto_feature_tool/config_builder/config.yaml` is added to your project's `.gitignore` file to avoid committing your API key. The main `.gitignore` provided with this tool already includes this.
 
 3. **Prepare Input Files** (at your project root):
 
@@ -89,18 +92,18 @@ The script will process each feature:
 - Generate a detailed implementation guide in `docs/guides/`
 - Invoke `claude-code` to implement the feature autonomously
 - Create temporary task files in `.claude/commands/` (cleaned up afterwards)
-- If `HUMAN_REVIEW="true"` in `config.sh`, pause after each feature for your review
+- If `script_behavior.human_review: true` in `auto_feature_tool/config_builder/config.yaml`, pause after each feature for your review
 
 ### Configuration Options
 
-Key settings in `auto_feature_tool/config.sh`:
+Key settings in `auto_feature_tool/config_builder/config.yaml`:
 
-- `OPENROUTER_API_KEY`: Your OpenRouter API key
-- `GEMINI_MODEL`: Model identifier for OpenRouter (default: "google/gemini-2.5-pro")
-- `PROJECT_CONTEXT_PATH`: Path to your project context file
-- `FEATURES_FILE_PATH`: Path to your features list
-- `HUMAN_REVIEW`: Set to "true" to pause for review after each feature
-- `GUIDES_DIR`: Directory where implementation guides are saved
+- `openrouter.api_key`: Your OpenRouter API key
+- `openrouter.gemini_model`: Model identifier for OpenRouter (default: "google/gemini-2.5-pro")
+- `paths.project_context`: Path to your project context file
+- `paths.features_file`: Path to your features list
+- `script_behavior.human_review`: Set to `true` to pause for review after each feature
+- `paths.guides_dir`: Directory where implementation guides are saved
 
 ### Architecture
 
@@ -133,9 +136,10 @@ The tool follows the Zen principle of elegant simplicity:
 Common issues and solutions:
 
 1. **Claude Code not found**: Ensure `claude-code` is installed globally and in your PATH
-2. **API Key errors**: Verify your OpenRouter API key is correctly set in `config.sh`
+2. **API Key errors**: Verify your OpenRouter API key is correctly set in `config.yaml`
 3. **Missing context files**: Ensure all required input files exist before running
 4. **jq not found**: Install `jq` for JSON parsing functionality
+5. **yq not found**: Install `yq` (by Mike Farah) for YAML configuration parsing
 
 ---
 

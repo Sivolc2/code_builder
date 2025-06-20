@@ -4,58 +4,98 @@
 # Orchestrates Gemini (via OpenRouter) for planning and Claude Code for implementation.
 
 set -e # Exit immediately if a command exits with a non-zero status.
-# set -u # Treat unset variables as an error. # Temporarily disabled for SCRIPT_DIR
+# set -u # Treat unset variables as an error.
 # set -o pipefail # Causes a pipeline to return the exit status of the last command in the pipe that failed.
 
 # --- Configuration and Setup ---
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-CONFIG_FILE="${SCRIPT_DIR}/config.sh"
+SCRIPT_DIR_INTERNAL=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+CONFIG_FILE_PATH="${SCRIPT_DIR_INTERNAL}/config_builder/config.yaml"
 
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "ERROR: Configuration file not found: $CONFIG_FILE"
-    echo "Please copy ${CONFIG_FILE}.example to $CONFIG_FILE and customize it."
+# Ensure yq is available
+if ! command -v yq &> /dev/null; then
+    echo "ERROR: yq is not installed. Please install yq (e.g., from https://github.com/mikefarah/yq)."
+    echo "       Common install methods: 'sudo apt-get install yq', 'brew install yq', or download binary."
     exit 1
 fi
-source "$CONFIG_FILE"
+
+if [ ! -f "$CONFIG_FILE_PATH" ]; then
+    echo "ERROR: Configuration file not found: $CONFIG_FILE_PATH"
+    echo "Please copy ${SCRIPT_DIR_INTERNAL}/config_builder/config.yaml.example to $CONFIG_FILE_PATH and customize it."
+    exit 1
+fi
+
+# Function to read value from YAML, providing a default if key is missing or null
+# Usage: get_config_value ".path.to.key" "default_value"
+get_config_value() {
+    local yaml_path="$1"
+    local default_value="$2"
+    local value
+    value=$(yq e "$yaml_path // \"$default_value\"" "$CONFIG_FILE_PATH")
+    # yq e '.key // "default"' -> if key is null or not present, uses default
+    # yq e '.key | select(. != null) // "default"' -> stricter for empty strings if needed
+    if [[ "$value" == "null" || -z "$value" ]]; then
+        echo "$default_value"
+    else
+        echo "$value"
+    fi
+}
+
+# --- Load Configuration ---
+OPENROUTER_API_KEY=$(get_config_value '.openrouter.api_key' "YOUR_OPENROUTER_API_KEY_HERE")
+GEMINI_MODEL=$(get_config_value '.openrouter.gemini_model' "google/gemini-2.5-pro")
+OPENROUTER_SITE_URL=$(get_config_value '.openrouter.site_url' "<YOUR_SITE_URL_OR_PROJECT_URL>")
+OPENROUTER_SITE_NAME=$(get_config_value '.openrouter.site_name' "<YOUR_APP_OR_PROJECT_NAME>")
+
+PROJECT_CONTEXT_PATH=$(get_config_value '.paths.project_context' "project_context.md")
+REPO_CONTENTS_PATH=$(get_config_value '.paths.repo_contents' "repo_contents.txt")
+FEATURES_FILE_PATH=$(get_config_value '.paths.features_file' "features_to_implement.txt")
+CLAUDE_RULES_PATH=$(get_config_value '.paths.claude_rules' "auto_feature_tool/CLAUDE_AGENT_RULES.md")
+GUIDES_DIR=$(get_config_value '.paths.guides_dir' "docs/guides")
+CLAUDE_TEMP_COMMANDS_DIR=$(get_config_value '.paths.claude_temp_commands_dir' ".claude/commands")
+
+HUMAN_REVIEW_STR=$(get_config_value '.script_behavior.human_review' "false")
+HUMAN_REVIEW=$( [ "$HUMAN_REVIEW_STR" == "true" ] && echo "true" || echo "false" ) # Ensure boolean interpretation
+
+CLAUDE_CLI_PATH_CONFIG=$(get_config_value '.claude_code.cli_path' "claude")
 
 # Validate essential configuration
 if [[ "${OPENROUTER_API_KEY}" == "YOUR_OPENROUTER_API_KEY_HERE" || -z "${OPENROUTER_API_KEY}" ]]; then
-  echo "ERROR: OPENROUTER_API_KEY is not set or is still the default placeholder in $CONFIG_FILE." >&2
+  echo "ERROR: OPENROUTER_API_KEY is not set or is still the default placeholder in $CONFIG_FILE_PATH." >&2
   exit 1
 fi
 
-# Ensure necessary commands are available
+# Ensure necessary commands are available (jq is still needed for parsing OpenRouter JSON response)
 if ! command -v jq &> /dev/null; then
     echo "ERROR: jq is not installed. Please install jq to parse JSON responses."
     exit 1
 fi
-CLAUDE_EXEC=${CLAUDE_CLI_PATH:-claude}
+CLAUDE_EXEC=${CLAUDE_CLI_PATH_CONFIG:-claude} # Use config value, fallback to 'claude'
 if ! command -v "$CLAUDE_EXEC" &> /dev/null; then
-    echo "ERROR: Claude Code CLI ('$CLAUDE_EXEC') not found. Please install it (e.g., npm install -g @anthropic-ai/claude-code) and ensure it's in your PATH or configured in config.sh."
+    echo "ERROR: Claude Code CLI ('$CLAUDE_EXEC') not found. Please install it (e.g., npm install -g @anthropic-ai/claude-code) and ensure it's in your PATH or configured in $CONFIG_FILE_PATH."
     exit 1
 fi
 
-# Ensure context files exist
+# Ensure context files exist (paths are relative to project root where script is run)
 if [ ! -f "$PROJECT_CONTEXT_PATH" ]; then
-    echo "ERROR: Project context file not found: $PROJECT_CONTEXT_PATH"
+    echo "ERROR: Project context file not found: $PROJECT_CONTEXT_PATH (as configured in $CONFIG_FILE_PATH)"
     exit 1
 fi
 if [ ! -f "$REPO_CONTENTS_PATH" ]; then
-    echo "ERROR: Repository contents file not found: $REPO_CONTENTS_PATH"
+    echo "ERROR: Repository contents file not found: $REPO_CONTENTS_PATH (as configured in $CONFIG_FILE_PATH)"
     exit 1
 fi
 if [ ! -f "$FEATURES_FILE_PATH" ]; then
-    echo "ERROR: Features file not found: $FEATURES_FILE_PATH"
+    echo "ERROR: Features file not found: $FEATURES_FILE_PATH (as configured in $CONFIG_FILE_PATH)"
     exit 1
 fi
 if [ ! -f "$CLAUDE_RULES_PATH" ]; then
-    echo "ERROR: Claude rules file not found: $CLAUDE_RULES_PATH"
+    echo "ERROR: Claude rules file not found: $CLAUDE_RULES_PATH (as configured in $CONFIG_FILE_PATH)"
     exit 1
 fi
 
-# Create output directories if they don't exist
+# Create output directories if they don't exist (relative to project root)
 mkdir -p "$GUIDES_DIR"
-mkdir -p "$CLAUDE_TEMP_COMMANDS_DIR"
+mkdir -p "$CLAUDE_TEMP_COMMANDS_DIR" # This should be at project root/.claude/commands
 
 # --- Helper Functions ---
 log_info() {
@@ -64,6 +104,10 @@ log_info() {
 
 log_error() {
     echo "[ERROR] $1" >&2
+}
+
+log_warn() {
+    echo "[WARN] $1" >&2
 }
 
 # Function to sanitize feature name for filenames
@@ -77,7 +121,7 @@ log_info "Starting feature implementation process..."
 # Read context files
 project_context_content=$(<"$PROJECT_CONTEXT_PATH")
 repo_contents_content=$(<"$REPO_CONTENTS_PATH")
-claude_rules_content=$(<"$CLAUDE_RULES_PATH") # Not directly injected, path is used by claude
+# claude_rules_content is not needed as string, path is used by claude command
 
 # Read and parse features file
 features_string=$(<"$FEATURES_FILE_PATH")
@@ -117,7 +161,7 @@ for feature_block in "${features_array[@]}"; do
     # 1. Generate Implementation Document (Gemini via OpenRouter)
     sanitized_name=$(sanitize_filename "$current_feature_name")
     guide_filename="${feature_index}_${sanitized_name}_change.md"
-    guide_path="${GUIDES_DIR}/${guide_filename}"
+    guide_path="${GUIDES_DIR}/${guide_filename}" # Path relative to project root
 
     log_info "Generating implementation guide using ${GEMINI_MODEL}..."
     gemini_prompt="You are an expert software architect. Given the following project context, repository contents, and a specific feature request, generate a detailed step-by-step implementation plan in Markdown format. This plan will be used by an AI coding assistant (Claude Code) to write the actual code. The plan should be clear, actionable, and provide enough detail for the AI to understand the requirements, necessary code changes, new files to create, and expected outcomes.
@@ -169,21 +213,20 @@ Produce only the Markdown implementation plan."
         continue
     fi
 
-    echo "$implementation_guide" > "$guide_path"
+    echo "$implementation_guide" > "$guide_path" # Writes to project_root/$GUIDES_DIR/...
     log_info "Implementation guide saved to: $guide_path"
 
     # 2. Implement with Claude Code
     temp_claude_command_name="feature_${feature_index}_${sanitized_name}_task"
     # Ensure temp_claude_command_name is valid for claude commands (alphanumeric, -, _)
     temp_claude_command_name_sanitized=$(echo "$temp_claude_command_name" | tr -s '[:punct:][:space:]' '_' | sed 's/__*/_/g' | sed 's/^_//;s/_$//' | tr '[:upper:]' '[:lower:]')
+    
+    # CLAUDE_TEMP_COMMANDS_DIR is relative to project root (e.g., .claude/commands)
     temp_claude_command_file="${CLAUDE_TEMP_COMMANDS_DIR}/${temp_claude_command_name_sanitized}.md"
     
-    # Ensure CLAUDE_RULES_PATH is absolute or relative to PWD
-    # If CLAUDE_RULES_PATH is relative, it should be relative to where the script is run (project root)
-    # The guide_path is already relative to project root or absolute.
+    # Ensure CLAUDE_RULES_PATH and guide_path are correctly referenced from PWD (project root)
+    # The paths read from config are already expected to be relative to project root.
 
-    # Construct the content for the temporary Claude slash command
-    # Using real paths for claude-code to read, assuming claude-code runs in PWD (project root)
     cat << EOF > "$temp_claude_command_file"
 Your current task is to implement the feature: "${current_feature_name}".
 
@@ -210,16 +253,16 @@ EOF
 
     log_info "Attempting to implement feature '${current_feature_name}' using Claude Code..."
     log_info "Claude Code will use the temporary command: /project:${temp_claude_command_name_sanitized}"
-    log_info "Task details written to: ${temp_claude_command_file}"
+    log_info "Task details written to: ${temp_claude_command_file} (relative to project root)"
     
     # Run Claude Code non-interactively with the prepared slash command
     # The --dangerously-skip-permissions flag is crucial for automation
+    # Claude Code runs in the current working directory (project root)
     if "$CLAUDE_EXEC" -p "/project:${temp_claude_command_name_sanitized}" --dangerously-skip-permissions; then
         log_info "Claude Code finished processing for feature: ${current_feature_name}"
     else
         log_error "Claude Code command failed for feature: ${current_feature_name}. Check Claude's output for details."
         # Decide if script should stop or continue
-        # For now, it will continue with the next feature if 'set -e' is not active for this block
     fi
     
     # Clean up temporary claude command file

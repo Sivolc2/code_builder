@@ -14,7 +14,7 @@ desktop.ini
 .env.production
 env.bak/
 # For the auto_feature_tool specifically
-auto_feature_tool/config.sh
+auto_feature_tool/config_builder/config.yaml
 
 # --- Python ---
 __pycache__/
