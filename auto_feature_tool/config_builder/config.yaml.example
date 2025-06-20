@@ -12,7 +12,7 @@ openrouter:
   # Model to use for generating implementation guides (via OpenRouter)
   # Example: "google/gemini-1.5-pro-latest", "openai/gpt-4o", "anthropic/claude-3-opus"
   # The user's request specified "google/gemini-2.5-pro". Ensure this model identifier is correct on OpenRouter.
-  gemini_model: "google/gemini-2.5-pro" # Verify this model string on OpenRouter
+  gemini_model: "google/gemini-2.5-pro-preview" # Verify this model string on OpenRouter
 
   # Optional headers for OpenRouter API calls (helps your app appear on leaderboards)
   site_url: "<YOUR_SITE_URL_OR_PROJECT_URL>" # e.g., https://yourproject.com
