@@ -10,10 +10,10 @@ import requests # For OpenRouter API calls
 
 # --- Configuration Loading & Constants ---
 # Assume script is run from project root, e.g., python auto_feature_tool/auto_feature.py
-PROJECT_ROOT = Path.cwd() 
-SCRIPT_DIR_FROM_ROOT = Path("auto_feature_tool") # Relative path of this tool's directory from project root
-CONFIG_FILE_PATH = PROJECT_ROOT / SCRIPT_DIR_FROM_ROOT / "config_builder" / "config.yaml"
-CONFIG_EXAMPLE_FILE_PATH = PROJECT_ROOT / SCRIPT_DIR_FROM_ROOT / "config_builder" / "config.yaml.example"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+SCRIPT_DIR_FROM_ROOT = PROJECT_ROOT / "auto_feature_tool" # Relative path of this tool's directory from project root
+CONFIG_FILE_PATH = SCRIPT_DIR_FROM_ROOT / "config_builder" / "config.yaml"
+CONFIG_EXAMPLE_FILE_PATH = SCRIPT_DIR_FROM_ROOT / "config_builder" / "config.yaml.example"
 
 FEATURE_SEPARATOR = "--- FEATURE SEPARATOR ---"
 
@@ -220,11 +220,6 @@ def run_claude_code(claude_cli_path: str, project_command_slug: str, temp_comman
         return False
 
 def main():
-    if not (PROJECT_ROOT / SCRIPT_DIR_FROM_ROOT / Path(__file__).name).is_file():
-        log_warn(f"Script seems to be run from an unexpected location. CWD: {PROJECT_ROOT.resolve()}")
-        log_warn(f"Expected script location relative to CWD: {SCRIPT_DIR_FROM_ROOT / Path(__file__).name}")
-        log_warn("Ensure you are running this script from your project's root directory.")
-
     config = load_config()
     display_paths(config) 
     validate_config_and_paths(config)
@@ -260,6 +255,14 @@ def main():
     log_info(f"Found {len(features)} features to process.")
 
     for index, feature_item in enumerate(features):
+        # Run git dump to update repo_contents.txt
+        try:
+            subprocess.run("git dump > repo_contents.txt", shell=True, check=True, cwd=PROJECT_ROOT)
+            log_info("Updated repo_contents.txt with latest repository state.")
+        except subprocess.CalledProcessError as e:
+            log_error(f"Failed to update repo_contents.txt: {e}")
+            continue
+
         feature_idx_display = index + 1
         current_feature_name = feature_item['name']
         current_feature_description = feature_item['description']
