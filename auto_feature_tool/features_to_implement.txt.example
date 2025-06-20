@@ -1,0 +1,17 @@
+Feature: Implement User Login
+Description:
+Develop a secure user login page with username and password fields.
+Upon successful authentication, redirect users to their dashboard.
+Include error handling for invalid credentials.
+--- FEATURE SEPARATOR ---
+Feature: Add User Profile Page
+Description:
+Create a page where logged-in users can view and edit their profile information.
+Profile information should include username, email, and an optional bio.
+Ensure data is saved persistently.
+--- FEATURE SEPARATOR ---
+Feature: Setup Basic API Endpoint for Items
+Description:
+Create a REST API endpoint GET /api/items that returns a list of predefined items.
+Items should be in JSON format.
+Example item structure: { "id": 1, "name": "Sample Item", "price": 10.99 } 
