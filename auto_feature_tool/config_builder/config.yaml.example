@@ -21,6 +21,11 @@ openrouter:
 # --- File Path Configurations (relative to the project root) ---
 # These paths are interpreted relative to the directory where auto_feature.sh is run (i.e., your project root).
 paths:
+  # Optional: Specify a custom project root directory (absolute path)
+  # If not specified (or set to null/empty), defaults to the parent directory of auto_feature_tool/
+  # Example: "/Users/username/my-project" or "C:\\Users\\username\\my-project"
+  project_root: null
+  
   project_context: "project_context.md"
   repo_contents: "repo_contents.txt"
   features_file: "features_to_implement.txt"

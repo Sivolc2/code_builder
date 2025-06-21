@@ -11,7 +11,7 @@ import requests # For OpenRouter API calls
 # --- Configuration Loading & Constants ---
 _SCRIPT_PATH = Path(__file__).resolve()
 TOOL_DIR = _SCRIPT_PATH.parent
-PROJECT_ROOT = TOOL_DIR.parent
+DEFAULT_PROJECT_ROOT = TOOL_DIR.parent
 TOOL_DIR_NAME_IN_PROJECT = TOOL_DIR.name # Should be 'auto_feature_tool'
 
 CONFIG_FILE_PATH = TOOL_DIR / "config_builder" / "config.yaml"
@@ -29,19 +29,30 @@ def log_error(message):
 def log_warn(message):
     print(f"[WARN] {message}", file=sys.stderr)
 
+def get_project_root(config):
+    """Get the project root directory from config, falling back to default if not specified."""
+    configured_root = config.get('paths', {}).get('project_root')
+    if configured_root:
+        return Path(configured_root).resolve()
+    return DEFAULT_PROJECT_ROOT
+
 def display_paths(config):
-    log_info("--- Path Configuration (all paths resolved from project root) ---")
-    log_info(f"Project Root (CWD): {PROJECT_ROOT.resolve()}")
-    log_info(f"Tool Script Directory (expected relative to root): {TOOL_DIR}")
+    project_root = get_project_root(config)
+    log_info("--- Path Configuration ---")
+    if config.get('paths', {}).get('project_root'):
+        log_info(f"Project Root (configured): {project_root}")
+    else:
+        log_info(f"Project Root (derived from script location): {project_root}")
+    log_info(f"Tool Directory (absolute): {TOOL_DIR.resolve()}")
     log_info(f"Config File Used: {CONFIG_FILE_PATH.resolve()}")
     
     paths_config = config.get('paths', {})
-    log_info(f"  Project Context: {(PROJECT_ROOT / paths_config['project_context']).resolve()} (from config: '{paths_config['project_context']}')")
-    log_info(f"  Repo Contents: {(PROJECT_ROOT / paths_config['repo_contents']).resolve()} (from config: '{paths_config['repo_contents']}')")
-    log_info(f"  Features File: {(PROJECT_ROOT / paths_config['features_file']).resolve()} (from config: '{paths_config['features_file']}')")
-    log_info(f"  Claude Rules: {(PROJECT_ROOT / paths_config['claude_rules']).resolve()} (from config: '{paths_config['claude_rules']}')")
-    log_info(f"  Guides Directory: {(PROJECT_ROOT / paths_config['guides_dir']).resolve()} (from config: '{paths_config['guides_dir']}')")
-    log_info(f"  Claude Temp Commands Dir: {(PROJECT_ROOT / paths_config['claude_temp_commands_dir']).resolve()} (from config: '{paths_config['claude_temp_commands_dir']}')")
+    log_info(f"  Project Context: {(project_root / paths_config['project_context']).resolve()} (from config: '{paths_config['project_context']}')")
+    log_info(f"  Repo Contents: {(project_root / paths_config['repo_contents']).resolve()} (from config: '{paths_config['repo_contents']}')")
+    log_info(f"  Features File: {(project_root / paths_config['features_file']).resolve()} (from config: '{paths_config['features_file']}')")
+    log_info(f"  Claude Rules: {(project_root / paths_config['claude_rules']).resolve()} (from config: '{paths_config['claude_rules']}')")
+    log_info(f"  Guides Directory: {(project_root / paths_config['guides_dir']).resolve()} (from config: '{paths_config['guides_dir']}')")
+    log_info(f"  Claude Temp Commands Dir: {(project_root / paths_config['claude_temp_commands_dir']).resolve()} (from config: '{paths_config['claude_temp_commands_dir']}')")
     log_info("--- End Path Configuration ---")
 
 def load_config():
@@ -60,10 +71,12 @@ def load_config():
     config['openrouter'].setdefault('site_name', "<YOUR_APP_OR_PROJECT_NAME>")
 
     config.setdefault('paths', {})
+    config['paths'].setdefault('project_root', None)  # None means use default (parent of tool dir)
     config['paths'].setdefault('project_context', "project_context.md")
     config['paths'].setdefault('repo_contents', "repo_contents.txt")
     config['paths'].setdefault('features_file', "features_to_implement.txt")
-    default_claude_rules_path = (TOOL_DIR / "CLAUDE_AGENT_RULES.md").as_posix()
+    # Default claude_rules path is relative to project root, pointing into the tool dir
+    default_claude_rules_path = f"{TOOL_DIR_NAME_IN_PROJECT}/CLAUDE_AGENT_RULES.md"
     config['paths'].setdefault('claude_rules', default_claude_rules_path)
     config['paths'].setdefault('guides_dir', "docs/guides")
     config['paths'].setdefault('claude_temp_commands_dir', ".claude/commands")
@@ -87,18 +100,24 @@ def validate_config_and_paths(config):
         sys.exit(1)
     
     if not shutil.which("git"):
-        log_warn("git command not found. 'git status' for human review might not work correctly.")
+        log_warn("git command not found. 'git status' and repo update features might not work correctly.")
 
+    project_root = get_project_root(config)
     paths_to_check = {
         "Project Context": Path(config['paths']['project_context']),
         "Repository Contents": Path(config['paths']['repo_contents']),
         "Features File": Path(config['paths']['features_file']),
         "Claude Rules File": Path(config['paths']['claude_rules']),
     }
-    for name, rel_path in paths_to_check.items():
-        abs_path = PROJECT_ROOT / rel_path
+    for name, rel_path_str in paths_to_check.items():
+        # Ensure rel_path_str is not None or empty before creating Path object
+        if not rel_path_str:
+            log_error(f"Configuration for '{name}' path is empty. Please check your config.yaml.")
+            sys.exit(1)
+        rel_path = Path(rel_path_str)
+        abs_path = project_root / rel_path
         if not abs_path.is_file():
-            log_error(f"{name} file not found: {abs_path} (configured as '{rel_path}')")
+            log_error(f"{name} file not found: {abs_path} (configured as '{rel_path_str}')")
             sys.exit(1)
 
 def sanitize_filename_for_path(name: str) -> str:
@@ -179,7 +198,7 @@ def call_openrouter_api(config, prompt_text: str):
             log_error(f"Response status: {e.response.status_code}, Response text: {e.response.text[:500]}")
         return None
 
-def run_claude_code(claude_cli_path: str, project_command_slug: str, temp_command_file_path: Path):
+def run_claude_code(claude_cli_path: str, project_command_slug: str, temp_command_file_path: Path, project_root: Path):
     claude_command_parts = [
         claude_cli_path,
         "-p", f"/project:{project_command_slug}",
@@ -189,7 +208,7 @@ def run_claude_code(claude_cli_path: str, project_command_slug: str, temp_comman
     log_info(f"Claude task details defined in: {temp_command_file_path.resolve()}")
 
     try:
-        process = subprocess.Popen(claude_command_parts, cwd=PROJECT_ROOT, text=True, 
+        process = subprocess.Popen(claude_command_parts, cwd=project_root, text=True, 
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1, universal_newlines=True)
         
         log_info("--- Claude Code Output START ---")
@@ -228,15 +247,17 @@ def main():
     display_paths(config) 
     validate_config_and_paths(config)
 
-    project_context_file = PROJECT_ROOT / config['paths']['project_context']
-    repo_contents_file = PROJECT_ROOT / config['paths']['repo_contents']
-    features_input_file = PROJECT_ROOT / config['paths']['features_file']
+    project_root = get_project_root(config)
+    
+    project_context_file = project_root / config['paths']['project_context']
+    repo_contents_file = project_root / config['paths']['repo_contents']
+    features_input_file = project_root / config['paths']['features_file']
     
     claude_rules_file_for_prompt = Path(config['paths']['claude_rules']) 
     guides_dir_for_prompt = Path(config['paths']['guides_dir'])
 
-    guides_output_dir_abs = PROJECT_ROOT / config['paths']['guides_dir']
-    claude_temp_commands_dir_abs = PROJECT_ROOT / config['paths']['claude_temp_commands_dir']
+    guides_output_dir_abs = project_root / config['paths']['guides_dir']
+    claude_temp_commands_dir_abs = project_root / config['paths']['claude_temp_commands_dir']
     
     claude_cli_path = config['claude_code']['cli_path']
     human_review_enabled = config['script_behavior']['human_review']
@@ -261,7 +282,7 @@ def main():
     for index, feature_item in enumerate(features):
         # Run git dump to update repo_contents.txt
         try:
-            subprocess.run("git dump", shell=True, check=True, cwd=PROJECT_ROOT)
+            subprocess.run("git dump", shell=True, check=True, cwd=project_root)
             log_info("Updated repo_contents.txt with latest repository state.")
         except subprocess.CalledProcessError as e:
             log_error(f"Failed to update repo_contents.txt: {e}")
@@ -344,7 +365,7 @@ Execute all these steps autonomously and comprehensively. Begin by reading the i
             log_error(f"Failed to write temporary Claude command file: {e}. Skipping feature.")
             continue
 
-        claude_success = run_claude_code(claude_cli_path, temp_claude_cmd_slug, temp_cmd_file_path_abs)
+        claude_success = run_claude_code(claude_cli_path, temp_claude_cmd_slug, temp_cmd_file_path_abs, project_root)
 
         try:
             temp_cmd_file_path_abs.unlink(missing_ok=True)
@@ -360,7 +381,7 @@ Execute all these steps autonomously and comprehensively. Begin by reading the i
             log_info(f"Feature '{current_feature_name}' processed. Review changes.")
             try:
                 log_info("Current Git status:")
-                subprocess.run(["git", "status", "-s"], cwd=PROJECT_ROOT, check=False) 
+                subprocess.run(["git", "status", "-s"], cwd=project_root, check=False) 
             except Exception as e:
                 log_warn(f"Could not get git status: {e}")
             input("Press Enter for next feature, or Ctrl+C to abort.")
