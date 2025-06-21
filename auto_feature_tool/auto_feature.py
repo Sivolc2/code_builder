@@ -9,11 +9,13 @@ import yaml # PyYAML
 import requests # For OpenRouter API calls
 
 # --- Configuration Loading & Constants ---
-# Assume script is run from project root, e.g., python auto_feature_tool/auto_feature.py
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-SCRIPT_DIR_FROM_ROOT = PROJECT_ROOT / "auto_feature_tool" # Relative path of this tool's directory from project root
-CONFIG_FILE_PATH = SCRIPT_DIR_FROM_ROOT / "config_builder" / "config.yaml"
-CONFIG_EXAMPLE_FILE_PATH = SCRIPT_DIR_FROM_ROOT / "config_builder" / "config.yaml.example"
+_SCRIPT_PATH = Path(__file__).resolve()
+TOOL_DIR = _SCRIPT_PATH.parent
+PROJECT_ROOT = TOOL_DIR.parent
+TOOL_DIR_NAME_IN_PROJECT = TOOL_DIR.name # Should be 'auto_feature_tool'
+
+CONFIG_FILE_PATH = TOOL_DIR / "config_builder" / "config.yaml"
+CONFIG_EXAMPLE_FILE_PATH = TOOL_DIR / "config_builder" / "config.yaml.example"
 
 FEATURE_SEPARATOR = "--- FEATURE SEPARATOR ---"
 
@@ -30,7 +32,7 @@ def log_warn(message):
 def display_paths(config):
     log_info("--- Path Configuration (all paths resolved from project root) ---")
     log_info(f"Project Root (CWD): {PROJECT_ROOT.resolve()}")
-    log_info(f"Tool Script Directory (expected relative to root): {SCRIPT_DIR_FROM_ROOT}")
+    log_info(f"Tool Script Directory (expected relative to root): {TOOL_DIR}")
     log_info(f"Config File Used: {CONFIG_FILE_PATH.resolve()}")
     
     paths_config = config.get('paths', {})
@@ -61,7 +63,7 @@ def load_config():
     config['paths'].setdefault('project_context', "project_context.md")
     config['paths'].setdefault('repo_contents', "repo_contents.txt")
     config['paths'].setdefault('features_file', "features_to_implement.txt")
-    default_claude_rules_path = (SCRIPT_DIR_FROM_ROOT / "CLAUDE_AGENT_RULES.md").as_posix()
+    default_claude_rules_path = (TOOL_DIR / "CLAUDE_AGENT_RULES.md").as_posix()
     config['paths'].setdefault('claude_rules', default_claude_rules_path)
     config['paths'].setdefault('guides_dir', "docs/guides")
     config['paths'].setdefault('claude_temp_commands_dir', ".claude/commands")
@@ -193,14 +195,16 @@ def run_claude_code(claude_cli_path: str, project_command_slug: str, temp_comman
         log_info("--- Claude Code Output START ---")
         if process.stdout:
             for stdout_line in iter(process.stdout.readline, ""):
-                print(stdout_line, end="") 
+                print(stdout_line, end="")
+                sys.stdout.flush()  # Ensure real-time output
             process.stdout.close()
         
         stderr_output = ""
         if process.stderr:
             for stderr_line in iter(process.stderr.readline, ""):
                 stderr_output += stderr_line
-                print(stderr_line, end="", file=sys.stderr) 
+                print(stderr_line, end="", file=sys.stderr)
+                sys.stderr.flush()  # Ensure real-time output
             process.stderr.close()
         log_info("--- Claude Code Output END ---")
         
@@ -257,7 +261,7 @@ def main():
     for index, feature_item in enumerate(features):
         # Run git dump to update repo_contents.txt
         try:
-            subprocess.run("git dump > repo_contents.txt", shell=True, check=True, cwd=PROJECT_ROOT)
+            subprocess.run("git dump", shell=True, check=True, cwd=PROJECT_ROOT)
             log_info("Updated repo_contents.txt with latest repository state.")
         except subprocess.CalledProcessError as e:
             log_error(f"Failed to update repo_contents.txt: {e}")
